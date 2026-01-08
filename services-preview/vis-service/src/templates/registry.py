@@ -1042,24 +1042,24 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-    # 绘制连接各山脊的 OHLC 价格线（对齐到山脊底部基线）
+    axes[-1].set_xlabel("Price", fontsize=10)
+    fig.suptitle(title, fontsize=12, fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    
+    # 绘制连接各山脊的 OHLC 价格线（必须在 tight_layout 之后）
     if show_ohlc and ohlc_opens and len(ohlc_opens) > 1:
         from matplotlib.lines import Line2D
         
-        # 每个子图的底部基线 y 坐标
-        y_baselines = []
-        for ax in axes:
-            bbox = ax.get_position()
-            y_baselines.append(bbox.y0)  # 底部基线
+        # 强制渲染以获取正确的坐标
+        fig.canvas.draw()
         
-        # 价格范围用于 x 坐标转换
-        price_range = bin_centers[-1] - bin_centers[0]
-        x_min = bin_centers[0]
-        
-        def price_to_x(price, ax_idx):
-            ax_bbox = axes[ax_idx].get_position()
-            x_norm = (price - x_min) / price_range
-            return ax_bbox.x0 + x_norm * ax_bbox.width
+        def price_to_fig_coord(price, ax):
+            """将价格转换为 figure 坐标，y 对齐到子图底部"""
+            # 使用 ylim[0] 确保对齐到子图实际底部
+            y_bottom = ax.get_ylim()[0]
+            display_coord = ax.transData.transform((price, y_bottom))
+            fig_coord = fig.transFigure.inverted().transform(display_coord)
+            return fig_coord[0], fig_coord[1]
         
         # 绘制 4 条连接线
         ohlc_lines = [
@@ -1071,22 +1071,18 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         
         legend_elements = []
         for prices, color, label in ohlc_lines:
-            valid_prices = [(i, p) for i, p in enumerate(prices) if p is not None]
-            if len(valid_prices) > 1:
-                xs = [price_to_x(p, i) for i, p in valid_prices]
-                ys = [y_baselines[i] for i, _ in valid_prices]
+            valid_points = [(y_positions[i], p) for i, p in enumerate(prices) if p is not None]
+            if len(valid_points) > 1:
+                fig_coords = [price_to_fig_coord(p, axes[idx]) for idx, p in valid_points]
+                xs = [c[0] for c in fig_coords]
+                ys = [c[1] for c in fig_coords]
                 line = Line2D(xs, ys, color=color, lw=2, alpha=0.9, transform=fig.transFigure, zorder=10)
                 fig.add_artist(line)
-                # 添加点标记
                 for x, y in zip(xs, ys):
                     fig.add_artist(plt.Circle((x, y), 0.006, color=color, transform=fig.transFigure, zorder=11))
             legend_elements.append(Line2D([0], [0], color=color, lw=2, marker='o', markersize=5, label=label))
         
         axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
-
-    axes[-1].set_xlabel("Price", fontsize=10)
-    fig.suptitle(title, fontsize=12, fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
 
     return _fig_to_png(fig), "image/png"
 
