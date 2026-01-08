@@ -136,8 +136,8 @@ class BookDepthCollector:
             return
 
         # 获取最优买卖价计算中间价
-        # cryptofeed 的 book 对象: book.book.bids/asks 是 SortedDict
-        # .index(0) 返回 (price, size) 元组
+        # cryptofeed 的 book 对象: book.book.bids/asks 是 order_book.SortedDict
+        # .index(0) 返回 (price, size) 元组，.to_dict() 返回 {price: size}
         if not book.book or not book.book.bids or not book.book.asks:
             return
 
@@ -148,9 +148,9 @@ class BookDepthCollector:
         except (IndexError, TypeError):
             return
 
-        # 转换订单簿格式: items() 返回 [(price, size), ...]
-        bids = [(float(p), float(s)) for p, s in book.book.bids.items()]
-        asks = [(float(p), float(s)) for p, s in book.book.asks.items()]
+        # 转换订单簿格式: to_dict() 返回 {price: size}
+        bids = [(float(p), float(s)) for p, s in book.book.bids.to_dict().items()]
+        asks = [(float(p), float(s)) for p, s in book.book.asks.to_dict().items()]
 
         # 聚合到百分比档位
         aggregated = self._aggregate_book(mid_price, bids, asks)
@@ -250,17 +250,6 @@ class BookDepthCollector:
             conn.commit()
         return n if n > 0 else len(rows)
 
-    def _on_book_sync(self, book, receipt_ts: float) -> None:
-        """同步回调包装器"""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(self._on_book(book, receipt_ts))
-            else:
-                asyncio.run(self._on_book(book, receipt_ts))
-        except RuntimeError:
-            asyncio.run(self._on_book(book, receipt_ts))
-
     def run(self) -> None:
         """运行采集器"""
         from cryptofeed import FeedHandler
@@ -276,7 +265,7 @@ class BookDepthCollector:
         kw = {
             "symbols": list(self._symbols.keys()),
             "channels": [L2_BOOK],
-            "callbacks": {L2_BOOK: self._on_book_sync},
+            "callbacks": {L2_BOOK: self._on_book},  # 直接使用 async 回调
             "timeout": 60,
         }
         if settings.http_proxy:
