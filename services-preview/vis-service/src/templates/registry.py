@@ -938,6 +938,13 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     if not distributions:
         raise ValueError("无有效的分布数据")
 
+    # 反转顺序：让 T-0（最新）在底部，T-n（最早）在顶部
+    # 山脊图从下往上看，时间递增
+    periods = periods[::-1]
+    distributions = distributions[::-1]
+    if ohlc_data:
+        ohlc_data = ohlc_data[::-1]
+
     # 计算全局价格范围
     all_prices = np.concatenate([d[0] for d in distributions])
     price_min, price_max = np.nanmin(all_prices), np.nanmax(all_prices)
