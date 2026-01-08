@@ -823,79 +823,46 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     return _fig_to_png(fig), "image/png"
 
 
-def _fetch_ridge_data_from_db(symbol: str, interval: str, periods: int = 10) -> Tuple[List[Dict], List[Dict]]:
-    """从 TimescaleDB 获取山脊图数据和 OHLC 数据。
+def _fetch_ridge_data_from_db(symbol: str, interval: str, periods: int = 10, lookback: int = 200, bins: int = 48) -> Tuple[List[Dict], List[Dict]]:
+    """从 trading-service 的 VPVR 计算方法获取山脊图数据。
     
     Returns:
         (ridge_data, ohlc_data): ridge_data=[{period, prices, volumes}], ohlc_data=[{period, open, high, low, close}]
     """
+    import sys
     import os
-    try:
-        import psycopg2
-    except ImportError:
-        logger.warning("psycopg2 not installed")
-        return [], []
     
-    interval_map = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
-    minutes = interval_map.get(interval, 60)
-    
-    db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data")
-    try:
-        conn = psycopg2.connect(db_url)
-    except Exception as e:
-        logger.error("DB connection failed: %s", e)
-        return [], []
+    # 添加 trading-service 路径
+    trading_service_path = os.path.join(os.path.dirname(__file__), "../../../../services/trading-service/src")
+    if trading_service_path not in sys.path:
+        sys.path.insert(0, os.path.abspath(trading_service_path))
     
     try:
-        cur = conn.cursor()
-        query = f"""
-            WITH ranked AS (
-                SELECT 
-                    bucket_ts, open, high, low, close, volume,
-                    FLOOR(EXTRACT(EPOCH FROM bucket_ts) / ({minutes} * 60)) AS period_id
-                FROM market_data.candles_1m
-                WHERE symbol = %s
-                ORDER BY bucket_ts DESC
-                LIMIT {periods * minutes}
-            )
-            SELECT 
-                period_id,
-                array_agg(close ORDER BY bucket_ts),
-                array_agg(volume ORDER BY bucket_ts),
-                (array_agg(open ORDER BY bucket_ts))[1] as period_open,
-                MAX(high) as period_high,
-                MIN(low) as period_low,
-                (array_agg(close ORDER BY bucket_ts DESC))[1] as period_close
-            FROM ranked
-            GROUP BY period_id
-            ORDER BY period_id DESC
-            LIMIT {periods}
-        """
-        cur.execute(query, (symbol,))
-        rows = cur.fetchall()
-        
-        ridge_data = []
-        ohlc_data = []
-        for i, (period_id, prices, volumes, p_open, p_high, p_low, p_close) in enumerate(reversed(rows)):
-            label = f"T-{len(rows)-1-i}"
-            ridge_data.append({
-                "period": label,
-                "prices": [float(p) for p in prices if p],
-                "volumes": [float(v) for v in volumes if v],
-            })
-            ohlc_data.append({
-                "period": label,
-                "open": float(p_open) if p_open else None,
-                "high": float(p_high) if p_high else None,
-                "low": float(p_low) if p_low else None,
-                "close": float(p_close) if p_close else None,
-            })
-        return ridge_data, ohlc_data
-    except Exception as e:
-        logger.error("Query failed: %s", e)
+        from indicators.batch.vpvr import compute_vpvr_ridge_data
+    except ImportError as e:
+        logger.warning("无法导入 VPVR 计算方法: %s", e)
         return [], []
-    finally:
-        conn.close()
+    
+    result = compute_vpvr_ridge_data(symbol, interval, periods, lookback, bins)
+    if not result or not result.get("periods"):
+        return [], []
+    
+    ridge_data = []
+    ohlc_data = []
+    for p in result["periods"]:
+        ridge_data.append({
+            "period": p["label"],
+            "distribution": [{"price": c, "volume": v} for c, v in zip(p["bin_centers"], p["volumes"])],
+        })
+        ohlc_data.append({
+            "period": p["label"],
+            "open": p["ohlc"]["open"],
+            "high": p["ohlc"]["high"],
+            "low": p["ohlc"]["low"],
+            "close": p["ohlc"]["close"],
+        })
+    
+    return ridge_data, ohlc_data
 
 
 def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
@@ -903,16 +870,17 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     VPVR 山脊图 - 展示成交量分布随时间演变。
 
     方式1 - 直接传数据：
-    - data: [{period, prices: list, volumes: list}]
+    - data: [{period, distribution: [{price, volume}]}]
     
     方式2 - 从数据库获取：
     - symbol: 交易对，如 BTCUSDT
     - interval: 周期，如 1h, 5m
     - periods: 周期数量，默认 10
+    - lookback: 每个周期的 K 线数量，默认 200（与 trading-service VPVR 一致）
     
     可选：
     - title: 标题
-    - bins: 价格分桶数，默认 50
+    - bins: 价格分桶数，默认 48（与 trading-service VPVR 一致）
     - overlap: 山脊重叠度，默认 0.5
     - colormap: 颜色映射，默认 viridis
     - show_ohlc: 是否显示 OHLC 价格线，默认 True
@@ -920,19 +888,20 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     data = params.get("data")
     ohlc_data = params.get("ohlc_data", [])
     
+    bins = int(params.get("bins", 48))  # 与 trading-service VPVR 一致
+    
     # 如果没有 data，尝试从数据库获取
     if not data and params.get("symbol"):
         symbol = params["symbol"]
         interval = params.get("interval", "1h")
         periods_count = int(params.get("periods", 10))
-        data, ohlc_data = _fetch_ridge_data_from_db(symbol, interval, periods_count)
+        lookback = int(params.get("lookback", 200))  # 与 trading-service VPVR 一致
+        data, ohlc_data = _fetch_ridge_data_from_db(symbol, interval, periods_count, lookback, bins)
         if not data:
             raise ValueError(f"无法获取 {symbol} {interval} 数据")
     
     if not data or not isinstance(data, list):
         raise ValueError("缺少 data 列表或 symbol 参数")
-
-    bins = int(params.get("bins", 50))
     overlap = float(params.get("overlap", 0.5))
     cmap_name = params.get("colormap", "viridis")
     show_ohlc = params.get("show_ohlc", True)
