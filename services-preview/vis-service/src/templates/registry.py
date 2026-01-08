@@ -939,7 +939,6 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         raise ValueError("无有效的分布数据")
 
     # 反转顺序：让 T-0（最新）在底部，T-n（最早）在顶部
-    # 山脊图从下往上看，时间递增
     periods = periods[::-1]
     distributions = distributions[::-1]
     if ohlc_data:
@@ -960,9 +959,6 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
 
     n_periods = len(periods)
     
-    # 构建 OHLC 字典
-    ohlc_dict = {item["period"]: item for item in ohlc_data} if ohlc_data else {}
-    
     if output == "json":
         return (
             {
@@ -975,85 +971,50 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
             "application/json",
         )
 
-    # 绘制山脊图
-    sns.set_theme(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
-    cmap = plt.cm.get_cmap(cmap_name)
+    # 使用 joypy 绘制标准山脊图
+    import joypy
+    import pandas as pd
+    from matplotlib import cm
     
-    fig, axes = plt.subplots(n_periods, 1, figsize=(12, max(6, n_periods * 0.8)), 
-                              sharex=True, gridspec_kw={"hspace": -overlap})
-
-    if n_periods == 1:
-        axes = [axes]
-
-    # 收集 OHLC 数据用于画线
-    ohlc_opens, ohlc_highs, ohlc_lows, ohlc_closes = [], [], [], []
-    y_positions = []
-
-    for i, (period, hist) in enumerate(zip(periods, histograms)):
-        ax = axes[i]
-        color = cmap(i / max(1, n_periods - 1))
-        
-        # 填充山脊
-        ax.fill_between(bin_centers, hist, alpha=0.8, color=color)
-        ax.plot(bin_centers, hist, color="white", lw=0.8)
-        
-        # 标记 POC
-        poc_idx = np.argmax(hist)
-        poc_price = bin_centers[poc_idx]
-        ax.axvline(poc_price, color="white", lw=1, ls="--", alpha=0.6)
-        
-        # 收集 OHLC
-        if period in ohlc_dict:
-            ohlc = ohlc_dict[period]
-            ohlc_opens.append(ohlc.get("open"))
-            ohlc_highs.append(ohlc.get("high"))
-            ohlc_lows.append(ohlc.get("low"))
-            ohlc_closes.append(ohlc.get("close"))
-            y_positions.append(i)
-        
-        ax.set_yticks([])
-        ax.set_ylabel(period, rotation=0, ha="right", va="center", fontsize=9)
-        ax.patch.set_alpha(0)
-        
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-
-    axes[-1].set_xlabel("Price", fontsize=10)
+    # 构建 DataFrame：每行是一个价格点，包含周期标签和成交量
+    df_rows = []
+    for period, hist in zip(periods, histograms):
+        for price, vol in zip(bin_centers, hist):
+            # 按成交量重复价格点，模拟分布
+            count = int(vol * 100) + 1
+            for _ in range(count):
+                df_rows.append({"period": period, "price": price})
+    
+    df = pd.DataFrame(df_rows)
+    
+    # joypy.joyplot 绘制
+    fig, axes = joypy.joyplot(
+        df,
+        by="period",
+        column="price",
+        colormap=cm.get_cmap(cmap_name),
+        overlap=overlap,
+        linewidth=1,
+        linecolor="white",
+        fade=True,
+        figsize=(12, max(6, n_periods * 0.8)),
+        grid="y",
+        xlabels=True,
+        ylabels=True,
+        legend=False,
+    )
+    
+    # 添加标题和 X 轴标签
     fig.suptitle(title, fontsize=12, fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    axes[-1].set_xlabel("Price", fontsize=10)
     
-    # 绘制横向 K 线（直接在每个子图的数据坐标系中绘制）
-    if show_ohlc and ohlc_opens and len(ohlc_opens) > 1:
-        from matplotlib.patches import Rectangle
-        from matplotlib.lines import Line2D
-        
-        for i, idx in enumerate(y_positions):
-            o, h, l, c = ohlc_opens[i], ohlc_highs[i], ohlc_lows[i], ohlc_closes[i]
-            if None in (o, h, l, c):
-                continue
-            
-            ax = axes[idx]
-            y_base = 0  # 山脊底部 y=0
-            kline_height = 0.08  # K 线高度（数据坐标）
-            
-            # High-Low 影线
-            ax.plot([l, h], [y_base, y_base], color='white', lw=1, zorder=10)
-            
-            # Open-Close 实体
-            x_left = min(o, c)
-            width = abs(c - o)
-            color = '#4CAF50' if c >= o else '#F44336'
-            
-            rect = Rectangle((x_left, y_base - kline_height/2), width, kline_height,
-                             facecolor=color, edgecolor='white', lw=0.5, zorder=11)
-            ax.add_patch(rect)
-        
-        # 图例
-        legend_elements = [
-            Line2D([0], [0], color='#4CAF50', lw=6, label='Up'),
-            Line2D([0], [0], color='#F44336', lw=6, label='Down'),
-        ]
-        axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
+    # 添加图例说明
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=cm.get_cmap(cmap_name)(0.0), label=f'{periods[0]} (oldest)'),
+        Patch(facecolor=cm.get_cmap(cmap_name)(1.0), label=f'{periods[-1]} (newest)'),
+    ]
+    axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 
     return _fig_to_png(fig), "image/png"
 
