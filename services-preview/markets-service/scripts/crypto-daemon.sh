@@ -32,6 +32,7 @@ fi
 # PID 文件
 PID_WS="$PID_DIR/crypto-ws.pid"
 PID_METRICS="$PID_DIR/crypto-metrics.pid"
+PID_BOOK="$PID_DIR/crypto-book-depth.pid"
 
 start_ws() {
     if [ -f "$PID_WS" ] && kill -0 $(cat "$PID_WS") 2>/dev/null; then
@@ -42,6 +43,17 @@ start_ws() {
     nohup python -m src crypto-ws > "$LOG_DIR/crypto-ws.log" 2>&1 &
     echo $! > "$PID_WS"
     echo "✓ crypto-ws 已启动 (PID: $!)"
+}
+
+start_book_depth() {
+    if [ -f "$PID_BOOK" ] && kill -0 $(cat "$PID_BOOK") 2>/dev/null; then
+        echo "⚠ crypto-book-depth 已在运行 (PID: $(cat $PID_BOOK))"
+        return 1
+    fi
+    echo "启动 crypto-book-depth (模式: $CRYPTO_WRITE_MODE)..."
+    nohup python -m src crypto-book-depth > "$LOG_DIR/crypto-book-depth.log" 2>&1 &
+    echo $! > "$PID_BOOK"
+    echo "✓ crypto-book-depth 已启动 (PID: $!)"
 }
 
 start_metrics() {
@@ -128,10 +140,17 @@ case "${1:-help}" in
         start_ws
         start_metrics
         ;;
+    start-book)
+        echo "=== 启动 BookDepth 采集 ==="
+        echo "代理: ${HTTP_PROXY:-未设置}"
+        echo "模式: $CRYPTO_WRITE_MODE"
+        start_book_depth
+        ;;
     stop)
         echo "=== 停止 Crypto 守护程序 ==="
         stop_process "crypto-ws" "$PID_WS"
         stop_process "crypto-metrics" "$PID_METRICS"
+        stop_process "crypto-book-depth" "$PID_BOOK"
         # 清理子进程
         pkill -f "python -m src crypto-" 2>/dev/null || true
         ;;
@@ -147,10 +166,15 @@ case "${1:-help}" in
         echo ""
         status_process "crypto-ws" "$PID_WS"
         status_process "crypto-metrics" "$PID_METRICS"
+        status_process "crypto-book-depth" "$PID_BOOK"
         ;;
     logs)
         echo "=== 最近日志 ==="
         tail -20 "$LOG_DIR/crypto-ws.log" 2>/dev/null || echo "无 ws 日志"
+        ;;
+    logs-book)
+        echo "=== BookDepth 日志 ==="
+        tail -50 "$LOG_DIR/crypto-book-depth.log" 2>/dev/null || echo "无 book-depth 日志"
         ;;
     daemon)
         echo "=== Crypto 守护程序启动 (守护模式) ==="
@@ -167,16 +191,18 @@ case "${1:-help}" in
     *)
         echo "Crypto 模块守护程序"
         echo ""
-        echo "用法: $0 {start|stop|restart|status|logs|daemon|health}"
+        echo "用法: $0 {start|stop|restart|status|logs|daemon|health|start-book|logs-book}"
         echo ""
         echo "命令:"
-        echo "  start   启动服务"
-        echo "  stop    停止服务"
-        echo "  restart 重启服务"
-        echo "  status  查看状态"
-        echo "  logs    查看日志"
-        echo "  daemon  守护模式 (自动重启)"
-        echo "  health  健康检查"
+        echo "  start      启动 K线+指标服务"
+        echo "  start-book 启动 BookDepth 采集"
+        echo "  stop       停止所有服务"
+        echo "  restart    重启服务"
+        echo "  status     查看状态"
+        echo "  logs       查看 K线日志"
+        echo "  logs-book  查看 BookDepth 日志"
+        echo "  daemon     守护模式 (自动重启)"
+        echo "  health     健康检查"
         echo ""
         echo "环境变量:"
         echo "  CRYPTO_WRITE_MODE    写入模式 (legacy/raw, 默认 legacy)"

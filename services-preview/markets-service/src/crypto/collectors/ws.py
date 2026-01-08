@@ -46,9 +46,32 @@ class WSCollector:
         self._flush_task: Optional[asyncio.Task] = None
 
     def _load_symbols(self) -> Dict[str, str]:
-        raw = load_symbols(settings.ccxt_exchange)
-        if not raw:
-            raise RuntimeError("未加载到交易对")
+        """加载交易对映射: cryptofeed 格式 -> 标准格式
+        
+        优先使用 config/.env 的 SYMBOLS_GROUPS 配置，
+        若为 auto/all 则从交易所加载全部。
+        """
+        import sys
+        from pathlib import Path
+        # 添加 libs/common 到路径
+        libs_path = Path(__file__).parent.parent.parent.parent.parent.parent / "libs" / "common"
+        if str(libs_path) not in sys.path:
+            sys.path.insert(0, str(libs_path))
+        
+        from symbols import get_configured_symbols
+        
+        configured = get_configured_symbols()
+        if configured:
+            # 使用配置的币种
+            raw = [s if s.endswith("USDT") else f"{s}USDT" for s in configured]
+            logger.info("使用配置的 %d 个币种 (SYMBOLS_GROUPS)", len(raw))
+        else:
+            # auto/all 模式，从交易所加载
+            raw = load_symbols(settings.ccxt_exchange)
+            if not raw:
+                raise RuntimeError("未加载到交易对")
+            logger.info("使用交易所全部 %d 个币种 (auto/all 模式)", len(raw))
+        
         mapping = {}
         for s in raw:
             n = normalize_symbol(s)
