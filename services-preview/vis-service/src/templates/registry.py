@@ -1031,7 +1031,6 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         
         def price_to_fig_coord(price, ax):
             """将价格转换为 figure 坐标，y 对齐到子图底部"""
-            # 使用 ylim[0] 确保对齐到子图实际底部
             y_bottom = ax.get_ylim()[0]
             display_coord = ax.transData.transform((price, y_bottom))
             fig_coord = fig.transFigure.inverted().transform(display_coord)
@@ -1052,11 +1051,13 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
                 fig_coords = [price_to_fig_coord(p, axes[idx]) for idx, p in valid_points]
                 xs = [c[0] for c in fig_coords]
                 ys = [c[1] for c in fig_coords]
-                line = Line2D(xs, ys, color=color, lw=2, alpha=0.9, transform=fig.transFigure, zorder=10)
+                # 线条更细 lw=1
+                line = Line2D(xs, ys, color=color, lw=1, alpha=0.9, transform=fig.transFigure, zorder=10)
                 fig.add_artist(line)
+                # 圆点更小 0.003
                 for x, y in zip(xs, ys):
-                    fig.add_artist(plt.Circle((x, y), 0.006, color=color, transform=fig.transFigure, zorder=11))
-            legend_elements.append(Line2D([0], [0], color=color, lw=2, marker='o', markersize=5, label=label))
+                    fig.add_artist(plt.Circle((x, y), 0.003, color=color, transform=fig.transFigure, zorder=11))
+            legend_elements.append(Line2D([0], [0], color=color, lw=1, marker='o', markersize=3, label=label))
         
         axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 
