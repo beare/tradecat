@@ -904,7 +904,7 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         raise ValueError("缺少 data 列表或 symbol 参数")
     overlap = float(params.get("overlap", 0.5))
     cmap_name = params.get("colormap", "viridis")
-    show_ohlc = params.get("show_ohlc", True)
+    show_ohlc = params.get("show_ohlc", False)
     
     # 自动生成标题
     if params.get("symbol"):
