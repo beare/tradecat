@@ -1023,42 +1023,63 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     
     # 绘制连接各山脊的 OHLC 价格线（必须在 tight_layout 之后）
+    # 使用横向 K 线形态：竖线表示 High-Low，矩形表示 Open-Close
     if show_ohlc and ohlc_opens and len(ohlc_opens) > 1:
+        from matplotlib.patches import Rectangle
         from matplotlib.lines import Line2D
         
-        # 强制渲染以获取正确的坐标
         fig.canvas.draw()
         
-        def price_to_fig_coord(price, ax):
-            """将价格转换为 figure 坐标，y 对齐到子图底部"""
+        def price_to_fig_x(price, ax):
+            """将价格转换为 figure x 坐标"""
             y_bottom = ax.get_ylim()[0]
             display_coord = ax.transData.transform((price, y_bottom))
             fig_coord = fig.transFigure.inverted().transform(display_coord)
-            return fig_coord[0], fig_coord[1]
+            return fig_coord[0]
         
-        # 绘制 4 条连接线
-        ohlc_lines = [
-            (ohlc_opens, '#2196F3', 'Open'),
-            (ohlc_highs, '#4CAF50', 'High'),
-            (ohlc_lows, '#F44336', 'Low'),
-            (ohlc_closes, '#FF9800', 'Close'),
+        def get_fig_y(ax):
+            """获取子图底部的 figure y 坐标"""
+            y_bottom = ax.get_ylim()[0]
+            display_coord = ax.transData.transform((0, y_bottom))
+            fig_coord = fig.transFigure.inverted().transform(display_coord)
+            return fig_coord[1]
+        
+        kline_height = 0.008  # K 线高度
+        
+        for i, idx in enumerate(y_positions):
+            o, h, l, c = ohlc_opens[i], ohlc_highs[i], ohlc_lows[i], ohlc_closes[i]
+            if None in (o, h, l, c):
+                continue
+            
+            ax = axes[idx]
+            y_center = get_fig_y(ax)
+            
+            # High-Low 影线（细线）
+            x_high = price_to_fig_x(h, ax)
+            x_low = price_to_fig_x(l, ax)
+            hl_line = Line2D([x_low, x_high], [y_center, y_center], 
+                            color='white', lw=1, transform=fig.transFigure, zorder=10)
+            fig.add_artist(hl_line)
+            
+            # Open-Close 实体（矩形）
+            x_open = price_to_fig_x(o, ax)
+            x_close = price_to_fig_x(c, ax)
+            x_left = min(x_open, x_close)
+            width = abs(x_close - x_open)
+            
+            # 涨跌颜色：收盘 > 开盘 = 绿色，否则红色
+            color = '#4CAF50' if c >= o else '#F44336'
+            
+            rect = Rectangle((x_left, y_center - kline_height/2), width, kline_height,
+                             facecolor=color, edgecolor='white', lw=0.5,
+                             transform=fig.transFigure, zorder=11)
+            fig.add_artist(rect)
+        
+        # 图例
+        legend_elements = [
+            Line2D([0], [0], color='#4CAF50', lw=6, label='Up'),
+            Line2D([0], [0], color='#F44336', lw=6, label='Down'),
         ]
-        
-        legend_elements = []
-        for prices, color, label in ohlc_lines:
-            valid_points = [(y_positions[i], p) for i, p in enumerate(prices) if p is not None]
-            if len(valid_points) > 1:
-                fig_coords = [price_to_fig_coord(p, axes[idx]) for idx, p in valid_points]
-                xs = [c[0] for c in fig_coords]
-                ys = [c[1] for c in fig_coords]
-                # 线条更细 lw=1
-                line = Line2D(xs, ys, color=color, lw=1, alpha=0.9, transform=fig.transFigure, zorder=10)
-                fig.add_artist(line)
-                # 圆点更小 0.003
-                for x, y in zip(xs, ys):
-                    fig.add_artist(plt.Circle((x, y), 0.003, color=color, transform=fig.transFigure, zorder=11))
-            legend_elements.append(Line2D([0], [0], color=color, lw=1, marker='o', markersize=3, label=label))
-        
         axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 
     return _fig_to_png(fig), "image/png"
