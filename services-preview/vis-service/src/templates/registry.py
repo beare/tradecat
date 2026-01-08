@@ -1022,29 +1022,10 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     fig.suptitle(title, fontsize=12, fontweight="bold", y=0.98)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     
-    # 绘制连接各山脊的 OHLC 价格线（必须在 tight_layout 之后）
-    # 使用横向 K 线形态：竖线表示 High-Low，矩形表示 Open-Close
+    # 绘制横向 K 线（直接在每个子图的数据坐标系中绘制）
     if show_ohlc and ohlc_opens and len(ohlc_opens) > 1:
         from matplotlib.patches import Rectangle
         from matplotlib.lines import Line2D
-        
-        fig.canvas.draw()
-        
-        def price_to_fig_x(price, ax):
-            """将价格转换为 figure x 坐标"""
-            y_bottom = ax.get_ylim()[0]
-            display_coord = ax.transData.transform((price, y_bottom))
-            fig_coord = fig.transFigure.inverted().transform(display_coord)
-            return fig_coord[0]
-        
-        def get_fig_y(ax):
-            """获取子图底部的 figure y 坐标"""
-            y_bottom = ax.get_ylim()[0]
-            display_coord = ax.transData.transform((0, y_bottom))
-            fig_coord = fig.transFigure.inverted().transform(display_coord)
-            return fig_coord[1]
-        
-        kline_height = 0.008  # K 线高度
         
         for i, idx in enumerate(y_positions):
             o, h, l, c = ohlc_opens[i], ohlc_highs[i], ohlc_lows[i], ohlc_closes[i]
@@ -1052,28 +1033,20 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
                 continue
             
             ax = axes[idx]
-            y_center = get_fig_y(ax)
+            y_base = 0  # 山脊底部 y=0
+            kline_height = 0.08  # K 线高度（数据坐标）
             
-            # High-Low 影线（细线）
-            x_high = price_to_fig_x(h, ax)
-            x_low = price_to_fig_x(l, ax)
-            hl_line = Line2D([x_low, x_high], [y_center, y_center], 
-                            color='white', lw=1, transform=fig.transFigure, zorder=10)
-            fig.add_artist(hl_line)
+            # High-Low 影线
+            ax.plot([l, h], [y_base, y_base], color='white', lw=1, zorder=10)
             
-            # Open-Close 实体（矩形）
-            x_open = price_to_fig_x(o, ax)
-            x_close = price_to_fig_x(c, ax)
-            x_left = min(x_open, x_close)
-            width = abs(x_close - x_open)
-            
-            # 涨跌颜色：收盘 > 开盘 = 绿色，否则红色
+            # Open-Close 实体
+            x_left = min(o, c)
+            width = abs(c - o)
             color = '#4CAF50' if c >= o else '#F44336'
             
-            rect = Rectangle((x_left, y_center - kline_height/2), width, kline_height,
-                             facecolor=color, edgecolor='white', lw=0.5,
-                             transform=fig.transFigure, zorder=11)
-            fig.add_artist(rect)
+            rect = Rectangle((x_left, y_base - kline_height/2), width, kline_height,
+                             facecolor=color, edgecolor='white', lw=0.5, zorder=11)
+            ax.add_patch(rect)
         
         # 图例
         legend_elements = [
