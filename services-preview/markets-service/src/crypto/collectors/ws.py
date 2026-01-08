@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import threading
 import time
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from ..adapters.ccxt import load_symbols, normalize_symbol
@@ -19,6 +21,11 @@ from ..adapters.cryptofeed import BinanceWSAdapter, CandleEvent, preload_symbols
 from ..adapters.metrics import metrics
 from ..adapters.timescale import TimescaleAdapter
 from ..config import settings
+
+# 添加 libs/common 到路径
+_libs_path = Path(__file__).parent.parent.parent.parent.parent.parent / "libs" / "common"
+if str(_libs_path) not in sys.path:
+    sys.path.insert(0, str(_libs_path))
 
 logger = logging.getLogger("ws.collector")
 
@@ -51,13 +58,6 @@ class WSCollector:
         优先使用 config/.env 的 SYMBOLS_GROUPS 配置，
         若为 auto/all 则从交易所加载全部。
         """
-        import sys
-        from pathlib import Path
-        # 添加 libs/common 到路径
-        libs_path = Path(__file__).parent.parent.parent.parent.parent.parent / "libs" / "common"
-        if str(libs_path) not in sys.path:
-            sys.path.insert(0, str(libs_path))
-        
         from symbols import get_configured_symbols
         
         configured = get_configured_symbols()
