@@ -223,9 +223,63 @@ SELECT create_hypertable('raw.funding_rate', 'funding_time',
 COMMENT ON TABLE raw.funding_rate IS '资金费率历史';
 
 -- ============================================================
--- raw.crypto_order_book - 订单簿快照 (混合存储)
+-- raw.crypto_order_book_tick - L1 高频 tick (1秒级)
+-- 设计原则: 轻量行，仅 top-of-book + 核心指标
+-- 主键设计: (exchange, symbol, timestamp) 与 orderbook_snapshot 一致
+-- ============================================================
+CREATE TABLE IF NOT EXISTS raw.crypto_order_book_tick (
+    timestamp       TIMESTAMPTZ NOT NULL,
+    exchange        TEXT NOT NULL,
+    symbol          TEXT NOT NULL,
+    -- 价格指标
+    mid_price       NUMERIC(38,18),
+    spread_bps      NUMERIC(10,4),
+    -- 最优档位
+    bid1_price      NUMERIC(38,18),
+    bid1_size       NUMERIC(38,18),
+    ask1_price      NUMERIC(38,18),
+    ask1_size       NUMERIC(38,18),
+    -- 快速深度 (1% 内)
+    bid_depth_1pct  NUMERIC(38,8),
+    ask_depth_1pct  NUMERIC(38,8),
+    imbalance       NUMERIC(10,6),
+    -- 血缘字段 (与其他 raw 表一致)
+    source          TEXT NOT NULL DEFAULT 'binance_ws',
+    ingest_batch_id BIGINT,
+    ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    PRIMARY KEY (exchange, symbol, timestamp)
+);
+
+SELECT create_hypertable('raw.crypto_order_book_tick', 'timestamp',
+    chunk_time_interval => INTERVAL '6 hours',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX idx_crypto_ob_tick_symbol ON raw.crypto_order_book_tick (symbol, timestamp DESC);
+CREATE INDEX idx_crypto_ob_tick_spread ON raw.crypto_order_book_tick (symbol, spread_bps) 
+    WHERE spread_bps IS NOT NULL;
+CREATE INDEX idx_crypto_ob_tick_imbalance ON raw.crypto_order_book_tick (symbol, imbalance) 
+    WHERE ABS(imbalance) > 0.3;
+
+-- 压缩策略: 6小时后压缩 (高频数据快速压缩)
+SELECT add_compression_policy('raw.crypto_order_book_tick', INTERVAL '6 hours', if_not_exists => TRUE);
+ALTER TABLE raw.crypto_order_book_tick SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'exchange, symbol',
+    timescaledb.compress_orderby = 'timestamp DESC'
+);
+
+-- 保留策略: 默认不删除 (可手动启用)
+-- SELECT add_retention_policy('raw.crypto_order_book_tick', INTERVAL '7 days', if_not_exists => TRUE);
+
+COMMENT ON TABLE raw.crypto_order_book_tick IS 'L1 tick 层 (1s采样, chunk=6h, compress=6h)';
+
+-- ============================================================
+-- raw.crypto_order_book - L2 全量快照 (5秒级)
 -- 设计原则: 1行=1快照，关键档位列存 + 完整盘口JSONB
--- 保留策略: 30天热数据
+-- 主键设计: (exchange, symbol, timestamp) 与 orderbook_snapshot 一致
+-- JSONB格式: [{p: price, s: size}, ...] 与 orderbook_snapshot 一致
 -- ============================================================
 CREATE TABLE IF NOT EXISTS raw.crypto_order_book (
     timestamp       TIMESTAMPTZ NOT NULL,
@@ -253,15 +307,15 @@ CREATE TABLE IF NOT EXISTS raw.crypto_order_book (
     bid_notional_5pct NUMERIC(38,8),            -- 买侧 5% 内名义价值
     ask_notional_5pct NUMERIC(38,8),            -- 卖侧 5% 内名义价值
     imbalance       NUMERIC(10,6),              -- 买卖失衡 (bid-ask)/(bid+ask) 基于1%深度
-    -- 完整盘口 (JSONB 紧凑存储)
-    bids            JSONB NOT NULL,             -- [[price, size], ...] 价格降序
-    asks            JSONB NOT NULL,             -- [[price, size], ...] 价格升序
-    -- 血缘字段
+    -- 完整盘口 (JSONB 标准格式，与 orderbook_snapshot 一致)
+    bids            JSONB NOT NULL,             -- [{p: price, s: size}, ...] 价格降序
+    asks            JSONB NOT NULL,             -- [{p: price, s: size}, ...] 价格升序
+    -- 血缘字段 (与其他 raw 表一致)
     source          TEXT NOT NULL DEFAULT 'binance_ws',
     ingest_batch_id BIGINT,
     ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     
-    PRIMARY KEY (symbol, timestamp)
+    PRIMARY KEY (exchange, symbol, timestamp)
 );
 
 SELECT create_hypertable('raw.crypto_order_book', 'timestamp',

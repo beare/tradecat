@@ -1265,4 +1265,34 @@ def register_defaults() -> TemplateRegistry:
         ),
         render_vpvr_zone_strip,
     )
+    registry.register(
+        TemplateMeta(
+            template_id="vpvr-ridge",
+            name="VPVR 山脊图",
+            description="展示成交量分布随时间演变，支持 OHLC 价格线叠加",
+            outputs=["png", "json"],
+            params=[
+                "symbol(str)",
+                "interval?(str, default 1h)",
+                "periods?(int, default 10)",
+                "lookback?(int, default 200)",
+                "bins?(int, default 48)",
+                "overlap?(float, default 0.5)",
+                "colormap?(str, default viridis)",
+                "show_ohlc?(bool, default True)",
+                "title?",
+            ],
+            sample={
+                "template_id": "vpvr-ridge",
+                "output": "png",
+                "params": {
+                    "symbol": "BTCUSDT",
+                    "interval": "1h",
+                    "periods": 10,
+                    "show_ohlc": True,
+                },
+            },
+        ),
+        render_vpvr_ridge,
+    )
     return registry
