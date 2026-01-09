@@ -51,14 +51,18 @@ async def handle_unexpected_error(_: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "内部错误"})
 
 
-if __name__ == "__main__":
-    # 方便本地调试：python -m src.main
+def run_server():
+    """Console script 入口点"""
     import uvicorn
 
     settings = get_settings()
     uvicorn.run(
-        "main:app",
+        "src.main:app",
         host=settings.host,
         port=settings.port,
         reload=False,
     )
+
+
+if __name__ == "__main__":
+    run_server()
