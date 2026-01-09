@@ -904,7 +904,7 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         raise ValueError("缺少 data 列表或 symbol 参数")
     overlap = float(params.get("overlap", 0.5))
     cmap_name = params.get("colormap", "viridis")
-    show_ohlc = params.get("show_ohlc", False)
+    show_ohlc = params.get("show_ohlc", True)
     
     # 自动生成标题
     if params.get("symbol"):
@@ -1008,13 +1008,78 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     fig.suptitle(title, fontsize=12, fontweight="bold", y=0.98)
     axes[-1].set_xlabel("Price", fontsize=10)
     
-    # 添加图例说明
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor=cm.get_cmap(cmap_name)(0.0), label=f'{periods[0]} (oldest)'),
-        Patch(facecolor=cm.get_cmap(cmap_name)(1.0), label=f'{periods[-1]} (newest)'),
-    ]
-    axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
+    # 添加 OHLC 价格线（4 条线连接各山脊子图）
+    if show_ohlc and ohlc_data and len(ohlc_data) == n_periods:
+        # joypy axes: axes[0] 是顶部子图，axes[-1] 是底部 X 轴
+        # 每个子图的基线 y=0，山脊向上延伸
+        # 需要在 figure 坐标系上绘制跨子图的线条
+        
+        # 提取 OHLC 数据
+        opens = [d["open"] for d in ohlc_data]
+        highs = [d["high"] for d in ohlc_data]
+        lows = [d["low"] for d in ohlc_data]
+        closes = [d["close"] for d in ohlc_data]
+        
+        # 获取每个子图的中心 y 位置（figure 坐标）
+        y_positions = []
+        for i, ax in enumerate(axes[:-1]):  # 排除最后一个（X 轴）
+            bbox = ax.get_position()
+            y_center = bbox.y0 + bbox.height * 0.3  # 山脊底部偏上一点
+            y_positions.append(y_center)
+        
+        # 获取 x 轴范围（数据坐标 -> figure 坐标）
+        main_ax = axes[-1]  # 底部轴共享 x 轴
+        xlim = main_ax.get_xlim()
+        
+        def price_to_fig_x(price):
+            """将价格转换为 figure x 坐标"""
+            bbox = main_ax.get_position()
+            rel = (price - xlim[0]) / (xlim[1] - xlim[0])
+            return bbox.x0 + rel * bbox.width
+        
+        # OHLC 线条颜色和样式
+        ohlc_styles = [
+            ("open", opens, "#2196F3", "-", 1.5),      # 蓝色 - 开盘价
+            ("high", highs, "#4CAF50", "--", 1.2),     # 绿色虚线 - 最高价
+            ("low", lows, "#F44336", "--", 1.2),       # 红色虚线 - 最低价
+            ("close", closes, "#FF9800", "-", 1.5),   # 橙色 - 收盘价
+        ]
+        
+        # 在 figure 坐标系上绘制线条
+        from matplotlib.lines import Line2D
+        for name, prices, color, linestyle, linewidth in ohlc_styles:
+            x_coords = [price_to_fig_x(p) for p in prices]
+            line = Line2D(
+                x_coords, y_positions,
+                color=color, linestyle=linestyle, linewidth=linewidth,
+                alpha=0.8, transform=fig.transFigure, zorder=10
+            )
+            fig.add_artist(line)
+            # 添加端点标记
+            for x, y in zip(x_coords, y_positions):
+                fig.add_artist(plt.Circle(
+                    (x, y), 0.006, color=color, transform=fig.transFigure, zorder=11
+                ))
+        
+        # 更新图例
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor=cm.get_cmap(cmap_name)(0.0), label=f'{periods[0]} (oldest)'),
+            Patch(facecolor=cm.get_cmap(cmap_name)(1.0), label=f'{periods[-1]} (newest)'),
+            Line2D([0], [0], color="#2196F3", linestyle="-", linewidth=1.5, label='Open'),
+            Line2D([0], [0], color="#4CAF50", linestyle="--", linewidth=1.2, label='High'),
+            Line2D([0], [0], color="#F44336", linestyle="--", linewidth=1.2, label='Low'),
+            Line2D([0], [0], color="#FF9800", linestyle="-", linewidth=1.5, label='Close'),
+        ]
+        axes[0].legend(handles=legend_elements, loc='upper right', fontsize=7, framealpha=0.9, ncol=2)
+    else:
+        # 无 OHLC 时的简单图例
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor=cm.get_cmap(cmap_name)(0.0), label=f'{periods[0]} (oldest)'),
+            Patch(facecolor=cm.get_cmap(cmap_name)(1.0), label=f'{periods[-1]} (newest)'),
+        ]
+        axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 
     return _fig_to_png(fig), "image/png"
 
