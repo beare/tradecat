@@ -33,6 +33,7 @@ fi
 PID_WS="$PID_DIR/crypto-ws.pid"
 PID_METRICS="$PID_DIR/crypto-metrics.pid"
 PID_BOOK="$PID_DIR/crypto-book-depth.pid"
+PID_ORDERBOOK="$PID_DIR/crypto-order-book.pid"
 
 start_ws() {
     if [ -f "$PID_WS" ] && kill -0 $(cat "$PID_WS") 2>/dev/null; then
@@ -54,6 +55,18 @@ start_book_depth() {
     nohup python -m src crypto-book-depth > "$LOG_DIR/crypto-book-depth.log" 2>&1 &
     echo $! > "$PID_BOOK"
     echo "✓ crypto-book-depth 已启动 (PID: $!)"
+}
+
+start_order_book() {
+    if [ -f "$PID_ORDERBOOK" ] && kill -0 $(cat "$PID_ORDERBOOK") 2>/dev/null; then
+        echo "⚠ crypto-order-book 已在运行 (PID: $(cat $PID_ORDERBOOK))"
+        return 1
+    fi
+    echo "启动 crypto-order-book..."
+    echo "  配置: ORDER_BOOK_INTERVAL=${ORDER_BOOK_INTERVAL:-10}s, ORDER_BOOK_DEPTH=${ORDER_BOOK_DEPTH:-20}"
+    nohup python -m src crypto-order-book > "$LOG_DIR/crypto-order-book.log" 2>&1 &
+    echo $! > "$PID_ORDERBOOK"
+    echo "✓ crypto-order-book 已启动 (PID: $!)"
 }
 
 start_metrics() {
@@ -139,18 +152,25 @@ case "${1:-help}" in
         echo ""
         start_ws
         start_metrics
+        start_order_book
         ;;
     start-book)
-        echo "=== 启动 BookDepth 采集 ==="
+        echo "=== 启动 BookDepth 采集 (百分比聚合) ==="
         echo "代理: ${HTTP_PROXY:-未设置}"
         echo "模式: $CRYPTO_WRITE_MODE"
         start_book_depth
+        ;;
+    start-orderbook)
+        echo "=== 启动 OrderBook 采集 (原始逐档) ==="
+        echo "代理: ${HTTP_PROXY:-未设置}"
+        start_order_book
         ;;
     stop)
         echo "=== 停止 Crypto 守护程序 ==="
         stop_process "crypto-ws" "$PID_WS"
         stop_process "crypto-metrics" "$PID_METRICS"
         stop_process "crypto-book-depth" "$PID_BOOK"
+        stop_process "crypto-order-book" "$PID_ORDERBOOK"
         # 清理子进程
         pkill -f "python -m src crypto-" 2>/dev/null || true
         ;;
@@ -167,6 +187,7 @@ case "${1:-help}" in
         status_process "crypto-ws" "$PID_WS"
         status_process "crypto-metrics" "$PID_METRICS"
         status_process "crypto-book-depth" "$PID_BOOK"
+        status_process "crypto-order-book" "$PID_ORDERBOOK"
         ;;
     logs)
         echo "=== 最近日志 ==="
@@ -176,12 +197,17 @@ case "${1:-help}" in
         echo "=== BookDepth 日志 ==="
         tail -50 "$LOG_DIR/crypto-book-depth.log" 2>/dev/null || echo "无 book-depth 日志"
         ;;
+    logs-orderbook)
+        echo "=== OrderBook 日志 ==="
+        tail -50 "$LOG_DIR/crypto-order-book.log" 2>/dev/null || echo "无 order-book 日志"
+        ;;
     daemon)
         echo "=== Crypto 守护程序启动 (守护模式) ==="
         echo "代理: ${HTTP_PROXY:-未设置}"
         echo "模式: $CRYPTO_WRITE_MODE"
         start_ws
         start_metrics
+        start_order_book
         daemon_mode
         ;;
     health)
@@ -191,21 +217,26 @@ case "${1:-help}" in
     *)
         echo "Crypto 模块守护程序"
         echo ""
-        echo "用法: $0 {start|stop|restart|status|logs|daemon|health|start-book|logs-book}"
+        echo "用法: $0 {start|stop|restart|status|logs|daemon|health|start-book|start-orderbook|logs-book|logs-orderbook}"
         echo ""
         echo "命令:"
-        echo "  start      启动 K线+指标服务"
-        echo "  start-book 启动 BookDepth 采集"
-        echo "  stop       停止所有服务"
-        echo "  restart    重启服务"
-        echo "  status     查看状态"
-        echo "  logs       查看 K线日志"
-        echo "  logs-book  查看 BookDepth 日志"
-        echo "  daemon     守护模式 (自动重启)"
-        echo "  health     健康检查"
+        echo "  start           启动 K线+指标服务"
+        echo "  start-book      启动 BookDepth 采集 (百分比聚合)"
+        echo "  start-orderbook 启动 OrderBook 采集 (原始逐档)"
+        echo "  stop            停止所有服务"
+        echo "  restart         重启服务"
+        echo "  status          查看状态"
+        echo "  logs            查看 K线日志"
+        echo "  logs-book       查看 BookDepth 日志"
+        echo "  logs-orderbook  查看 OrderBook 日志"
+        echo "  daemon          守护模式 (自动重启)"
+        echo "  health          健康检查"
         echo ""
         echo "环境变量:"
-        echo "  CRYPTO_WRITE_MODE    写入模式 (legacy/raw, 默认 legacy)"
-        echo "  MARKETS_SERVICE_DATABASE_URL  数据库连接"
+        echo "  CRYPTO_WRITE_MODE              写入模式 (legacy/raw, 默认 legacy)"
+        echo "  MARKETS_SERVICE_DATABASE_URL   数据库连接"
+        echo "  ORDER_BOOK_INTERVAL            采样间隔秒数 (默认 10)"
+        echo "  ORDER_BOOK_DEPTH               每侧档位数 (默认 20)"
+        echo "  ORDER_BOOK_SYMBOLS             指定币种 (可选，逗号分隔)"
         ;;
 esac

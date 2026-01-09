@@ -221,3 +221,102 @@ SELECT create_hypertable('raw.funding_rate', 'funding_time',
 );
 
 COMMENT ON TABLE raw.funding_rate IS '资金费率历史';
+
+-- ============================================================
+-- raw.crypto_order_book - 订单簿快照 (混合存储)
+-- 设计原则: 1行=1快照，关键档位列存 + 完整盘口JSONB
+-- 保留策略: 30天热数据
+-- ============================================================
+CREATE TABLE IF NOT EXISTS raw.crypto_order_book (
+    timestamp       TIMESTAMPTZ NOT NULL,
+    exchange        TEXT NOT NULL,
+    symbol          TEXT NOT NULL,
+    -- 元数据
+    seq_id          BIGINT,                     -- 序列号 (连续性校验)
+    depth           INT NOT NULL,               -- 档位数
+    -- 价格指标 (预计算，便于快速查询)
+    mid_price       NUMERIC(38,18),             -- 中间价 (bid1+ask1)/2
+    spread          NUMERIC(38,18),             -- 价差 ask1-bid1
+    spread_bps      NUMERIC(10,4),              -- 价差基点 spread/mid*10000
+    -- 最优档位 (列存，直接查询)
+    bid1_price      NUMERIC(38,18),
+    bid1_size       NUMERIC(38,18),
+    ask1_price      NUMERIC(38,18),
+    ask1_size       NUMERIC(38,18),
+    -- 深度统计 (聚合指标)
+    bid_depth_1pct  NUMERIC(38,8),              -- 买侧 1% 内深度 (张数)
+    ask_depth_1pct  NUMERIC(38,8),              -- 卖侧 1% 内深度
+    bid_depth_5pct  NUMERIC(38,8),              -- 买侧 5% 内深度
+    ask_depth_5pct  NUMERIC(38,8),              -- 卖侧 5% 内深度
+    bid_notional_1pct NUMERIC(38,8),            -- 买侧 1% 内名义价值 (USDT)
+    ask_notional_1pct NUMERIC(38,8),            -- 卖侧 1% 内名义价值
+    bid_notional_5pct NUMERIC(38,8),            -- 买侧 5% 内名义价值
+    ask_notional_5pct NUMERIC(38,8),            -- 卖侧 5% 内名义价值
+    imbalance       NUMERIC(10,6),              -- 买卖失衡 (bid-ask)/(bid+ask) 基于1%深度
+    -- 完整盘口 (JSONB 紧凑存储)
+    bids            JSONB NOT NULL,             -- [[price, size], ...] 价格降序
+    asks            JSONB NOT NULL,             -- [[price, size], ...] 价格升序
+    -- 血缘字段
+    source          TEXT NOT NULL DEFAULT 'binance_ws',
+    ingest_batch_id BIGINT,
+    ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    PRIMARY KEY (symbol, timestamp)
+);
+
+SELECT create_hypertable('raw.crypto_order_book', 'timestamp',
+    chunk_time_interval => INTERVAL '1 day',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX idx_crypto_ob_symbol_time ON raw.crypto_order_book (symbol, timestamp DESC);
+CREATE INDEX idx_crypto_ob_time ON raw.crypto_order_book (timestamp DESC);
+CREATE INDEX idx_crypto_ob_spread ON raw.crypto_order_book (symbol, spread_bps) WHERE spread_bps IS NOT NULL;
+
+-- 压缩策略: 1天后压缩 (订单簿数据量大)
+SELECT add_compression_policy('raw.crypto_order_book', INTERVAL '1 day', if_not_exists => TRUE);
+ALTER TABLE raw.crypto_order_book SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'exchange, symbol',
+    timescaledb.compress_orderby = 'timestamp DESC'
+);
+
+-- 保留策略: 30天 (可通过 ORDER_BOOK_RETENTION_DAYS 配置)
+-- SELECT add_retention_policy('raw.crypto_order_book', INTERVAL '30 days', if_not_exists => TRUE);
+
+COMMENT ON TABLE raw.crypto_order_book IS '订单簿快照-混合存储 (1行=1快照, chunk=1d, compress=1d)';
+
+-- ============================================================
+-- raw.crypto_book_depth - 订单簿百分比深度 (聚合版)
+-- 用途: 深度分析、流动性监控
+-- ============================================================
+CREATE TABLE IF NOT EXISTS raw.crypto_book_depth (
+    timestamp       TIMESTAMPTZ NOT NULL,
+    exchange        TEXT NOT NULL,
+    symbol          TEXT NOT NULL,
+    percentage      INT NOT NULL,               -- -5,-4,-3,-2,-1,1,2,3,4,5 (负=买侧)
+    depth           NUMERIC(38,18) NOT NULL,    -- 累计数量
+    notional        NUMERIC(38,18) NOT NULL,    -- 累计名义价值
+    -- 血缘字段
+    source          TEXT NOT NULL DEFAULT 'binance_ws',
+    ingest_batch_id BIGINT,
+    ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    PRIMARY KEY (exchange, symbol, timestamp, percentage)
+);
+
+SELECT create_hypertable('raw.crypto_book_depth', 'timestamp',
+    chunk_time_interval => INTERVAL '1 day',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX idx_crypto_bd_symbol_time ON raw.crypto_book_depth (symbol, timestamp DESC);
+
+SELECT add_compression_policy('raw.crypto_book_depth', INTERVAL '1 day', if_not_exists => TRUE);
+ALTER TABLE raw.crypto_book_depth SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'exchange, symbol',
+    timescaledb.compress_orderby = 'timestamp DESC'
+);
+
+COMMENT ON TABLE raw.crypto_book_depth IS '订单簿百分比深度 (chunk=1d, compress=1d)';

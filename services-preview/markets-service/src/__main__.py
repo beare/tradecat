@@ -21,7 +21,7 @@ def main():
         "test", "collect", "pricing",
         # 加密货币采集命令 (移植自 data-service)
         "crypto-backfill", "crypto-metrics", "crypto-ws", "crypto-scan", "crypto-test",
-        "crypto-book-depth"
+        "crypto-book-depth", "crypto-order-book"
     ], help="命令")
     parser.add_argument("--provider", default="yfinance", help="数据源")
     parser.add_argument("--symbol", default="AAPL", help="标的代码")
@@ -206,12 +206,20 @@ def main():
         WSCollector().run()
 
     elif args.command == "crypto-book-depth":
-        # WebSocket 订单簿采集
+        # WebSocket 订单簿采集 (百分比聚合)
         from crypto.collectors.book_depth import BookDepthCollector
         from crypto.config import settings
 
         logger.info("启动 BookDepth WebSocket 采集 (模式: %s)", settings.write_mode)
         BookDepthCollector().run()
+
+    elif args.command == "crypto-order-book":
+        # WebSocket 原始逐档盘口采集
+        from crypto.collectors.order_book import OrderBookCollector
+        from crypto.config import settings
+
+        logger.info("启动 OrderBook WebSocket 采集 (模式: %s)", settings.write_mode)
+        OrderBookCollector().run()
 
 
 if __name__ == "__main__":
