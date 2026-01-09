@@ -228,9 +228,9 @@ COMMENT ON TABLE raw.funding_rate IS '资金费率历史';
 -- 主键设计: (exchange, symbol, timestamp) 与 orderbook_snapshot 一致
 -- ============================================================
 CREATE TABLE IF NOT EXISTS raw.crypto_order_book_tick (
-    timestamp       TIMESTAMPTZ NOT NULL,
     exchange        TEXT NOT NULL,
     symbol          TEXT NOT NULL,
+    timestamp       TIMESTAMPTZ NOT NULL,
     -- 价格指标
     mid_price       NUMERIC(38,18),
     spread_bps      NUMERIC(10,4),
@@ -243,10 +243,12 @@ CREATE TABLE IF NOT EXISTS raw.crypto_order_book_tick (
     bid_depth_1pct  NUMERIC(38,8),
     ask_depth_1pct  NUMERIC(38,8),
     imbalance       NUMERIC(10,6),
-    -- 血缘字段 (与其他 raw 表一致)
+    -- 血缘字段 (与 crypto_kline_1m 一致)
     source          TEXT NOT NULL DEFAULT 'binance_ws',
     ingest_batch_id BIGINT,
+    source_event_time TIMESTAMPTZ,
     ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     
     PRIMARY KEY (exchange, symbol, timestamp)
 );
@@ -256,7 +258,9 @@ SELECT create_hypertable('raw.crypto_order_book_tick', 'timestamp',
     if_not_exists => TRUE
 );
 
-CREATE INDEX idx_crypto_ob_tick_symbol ON raw.crypto_order_book_tick (symbol, timestamp DESC);
+CREATE INDEX idx_crypto_ob_tick_symbol_time ON raw.crypto_order_book_tick (symbol, timestamp DESC);
+CREATE INDEX idx_crypto_ob_tick_time ON raw.crypto_order_book_tick (timestamp DESC);
+CREATE INDEX idx_crypto_ob_tick_batch ON raw.crypto_order_book_tick (ingest_batch_id);
 CREATE INDEX idx_crypto_ob_tick_spread ON raw.crypto_order_book_tick (symbol, spread_bps) 
     WHERE spread_bps IS NOT NULL;
 CREATE INDEX idx_crypto_ob_tick_imbalance ON raw.crypto_order_book_tick (symbol, imbalance) 
@@ -277,18 +281,20 @@ COMMENT ON TABLE raw.crypto_order_book_tick IS 'L1 tick 层 (1s采样, chunk=6h,
 
 -- ============================================================
 -- raw.crypto_order_book - L2 全量快照 (5秒级)
--- 设计原则: 1行=1快照，关键档位列存 + 完整盘口JSONB
--- 主键设计: (exchange, symbol, timestamp) 与 orderbook_snapshot 一致
--- JSONB格式: [{p: price, s: size}, ...] 与 orderbook_snapshot 一致
+-- 设计原则: 1行=1快照，关键档位列存 + 完整原始盘口
+-- 原始数据结构 (Binance Futures /fapi/v1/depth):
+--   lastUpdateId, E (event_time), T (transaction_time)
+--   bids: [[price, qty], ...], asks: [[price, qty], ...]
 -- ============================================================
 CREATE TABLE IF NOT EXISTS raw.crypto_order_book (
-    timestamp       TIMESTAMPTZ NOT NULL,
     exchange        TEXT NOT NULL,
     symbol          TEXT NOT NULL,
-    -- 元数据
-    seq_id          BIGINT,                     -- 序列号 (连续性校验)
+    timestamp       TIMESTAMPTZ NOT NULL,       -- 事件时间 E
+    -- 原始元数据 (与 Binance 字段对应)
+    last_update_id  BIGINT,                     -- lastUpdateId 序列号
+    transaction_time TIMESTAMPTZ,               -- T 交易时间
     depth           INT NOT NULL,               -- 档位数
-    -- 价格指标 (预计算，便于快速查询)
+    -- 预计算指标 (便于快速查询)
     mid_price       NUMERIC(38,18),             -- 中间价 (bid1+ask1)/2
     spread          NUMERIC(38,18),             -- 价差 ask1-bid1
     spread_bps      NUMERIC(10,4),              -- 价差基点 spread/mid*10000
@@ -298,22 +304,24 @@ CREATE TABLE IF NOT EXISTS raw.crypto_order_book (
     ask1_price      NUMERIC(38,18),
     ask1_size       NUMERIC(38,18),
     -- 深度统计 (聚合指标)
-    bid_depth_1pct  NUMERIC(38,8),              -- 买侧 1% 内深度 (张数)
+    bid_depth_1pct  NUMERIC(38,8),              -- 买侧 1% 内深度
     ask_depth_1pct  NUMERIC(38,8),              -- 卖侧 1% 内深度
     bid_depth_5pct  NUMERIC(38,8),              -- 买侧 5% 内深度
     ask_depth_5pct  NUMERIC(38,8),              -- 卖侧 5% 内深度
-    bid_notional_1pct NUMERIC(38,8),            -- 买侧 1% 内名义价值 (USDT)
-    ask_notional_1pct NUMERIC(38,8),            -- 卖侧 1% 内名义价值
-    bid_notional_5pct NUMERIC(38,8),            -- 买侧 5% 内名义价值
-    ask_notional_5pct NUMERIC(38,8),            -- 卖侧 5% 内名义价值
-    imbalance       NUMERIC(10,6),              -- 买卖失衡 (bid-ask)/(bid+ask) 基于1%深度
-    -- 完整盘口 (JSONB 标准格式，与 orderbook_snapshot 一致)
-    bids            JSONB NOT NULL,             -- [{p: price, s: size}, ...] 价格降序
-    asks            JSONB NOT NULL,             -- [{p: price, s: size}, ...] 价格升序
-    -- 血缘字段 (与其他 raw 表一致)
+    bid_notional_1pct NUMERIC(38,8),            -- 买侧 1% 名义价值 (USDT)
+    ask_notional_1pct NUMERIC(38,8),            -- 卖侧 1% 名义价值
+    bid_notional_5pct NUMERIC(38,8),            -- 买侧 5% 名义价值
+    ask_notional_5pct NUMERIC(38,8),            -- 卖侧 5% 名义价值
+    imbalance       NUMERIC(10,6),              -- 买卖失衡
+    -- 完整原始盘口 (与 Binance 格式一致)
+    bids            JSONB NOT NULL,             -- [["price","qty"], ...] 原始字符串格式
+    asks            JSONB NOT NULL,             -- [["price","qty"], ...] 原始字符串格式
+    -- 血缘字段
     source          TEXT NOT NULL DEFAULT 'binance_ws',
     ingest_batch_id BIGINT,
+    source_event_time TIMESTAMPTZ,              -- 原始事件时间 (毫秒精度)
     ingested_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     
     PRIMARY KEY (exchange, symbol, timestamp)
 );
@@ -325,6 +333,7 @@ SELECT create_hypertable('raw.crypto_order_book', 'timestamp',
 
 CREATE INDEX idx_crypto_ob_symbol_time ON raw.crypto_order_book (symbol, timestamp DESC);
 CREATE INDEX idx_crypto_ob_time ON raw.crypto_order_book (timestamp DESC);
+CREATE INDEX idx_crypto_ob_batch ON raw.crypto_order_book (ingest_batch_id);
 CREATE INDEX idx_crypto_ob_spread ON raw.crypto_order_book (symbol, spread_bps) WHERE spread_bps IS NOT NULL;
 
 -- 压缩策略: 1天后压缩 (订单簿数据量大)

@@ -196,9 +196,15 @@ class OrderBookCollector:
         }
 
     def _build_full_row(
-        self, sym: str, ts: datetime, bids_dict: dict, asks_dict: dict
+        self, sym: str, ts: datetime, bids_dict: dict, asks_dict: dict,
+        last_update_id: Optional[int] = None, transaction_time: Optional[datetime] = None
     ) -> Optional[dict]:
-        """构建 L2 full 行 (完整)"""
+        """构建 L2 full 行 - 保留原始格式
+        
+        原始 Binance 格式:
+            lastUpdateId, E (event_time), T (transaction_time)
+            bids: [["price", "qty"], ...], asks: [["price", "qty"], ...]
+        """
         if not bids_dict or not asks_dict:
             return None
         
@@ -214,7 +220,7 @@ class OrderBookCollector:
         spread = ask1_p - bid1_p
         spread_bps = (spread / mid * 10000) if mid > 0 else 0
         
-        # 转为列表用于深度计算
+        # 深度统计
         bids_list = [(float(p), float(bids_dict[p])) for p in bid_prices]
         asks_list = [(float(p), float(asks_dict[p])) for p in ask_prices]
         stats = self._compute_depth_stats(mid, bids_list, asks_list)
@@ -222,14 +228,16 @@ class OrderBookCollector:
         total_1pct = stats["bid_depth_1pct"] + stats["ask_depth_1pct"]
         imbalance = float((stats["bid_depth_1pct"] - stats["ask_depth_1pct"]) / total_1pct) if total_1pct > 0 else 0
         
-        # JSONB 标准格式: [{p: price, s: size}, ...] 与 orderbook_snapshot 一致
-        bids_jsonb = [{"p": float(p), "s": float(bids_dict[p])} for p in bid_prices]
-        asks_jsonb = [{"p": float(p), "s": float(asks_dict[p])} for p in ask_prices]
+        # 原始格式: [["price", "qty"], ...] 字符串保留精度
+        bids_raw = [[str(p), str(bids_dict[p])] for p in bid_prices]
+        asks_raw = [[str(p), str(asks_dict[p])] for p in ask_prices]
         
         return {
             "timestamp": ts,
             "exchange": settings.db_exchange,
             "symbol": sym,
+            "last_update_id": last_update_id,
+            "transaction_time": transaction_time,
             "depth": len(bids_list),
             "mid_price": Decimal(str(mid)),
             "spread": Decimal(str(spread)),
@@ -240,8 +248,8 @@ class OrderBookCollector:
             "ask1_size": Decimal(str(ask1_s)),
             **stats,
             "imbalance": Decimal(str(round(imbalance, 6))),
-            "bids": json.dumps(bids_jsonb),
-            "asks": json.dumps(asks_jsonb),
+            "bids": json.dumps(bids_raw),
+            "asks": json.dumps(asks_raw),
         }
 
     async def _on_book(self, book, receipt_ts: float) -> None:
@@ -359,7 +367,8 @@ class OrderBookCollector:
         from psycopg import sql
 
         cols = [
-            "timestamp", "exchange", "symbol", "depth",
+            "exchange", "symbol", "timestamp",
+            "last_update_id", "transaction_time", "depth",
             "mid_price", "spread", "spread_bps",
             "bid1_price", "bid1_size", "ask1_price", "ask1_size",
             "bid_depth_1pct", "ask_depth_1pct", "bid_depth_5pct", "ask_depth_5pct",
