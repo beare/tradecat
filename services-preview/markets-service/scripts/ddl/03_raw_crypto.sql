@@ -320,3 +320,78 @@ ALTER TABLE raw.crypto_book_depth SET (
 );
 
 COMMENT ON TABLE raw.crypto_book_depth IS '订单簿百分比深度 (chunk=1d, compress=1d)';
+
+-- ============================================================
+-- 连续聚合视图: 订单簿 1 分钟聚合
+-- 用途: 快速查询分钟级流动性指标
+-- ============================================================
+CREATE MATERIALIZED VIEW IF NOT EXISTS agg.order_book_1m
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('1 minute', timestamp) AS bucket,
+    exchange,
+    symbol,
+    -- 价格统计
+    AVG(mid_price) AS avg_mid_price,
+    AVG(spread_bps) AS avg_spread_bps,
+    MAX(spread_bps) AS max_spread_bps,
+    MIN(spread_bps) AS min_spread_bps,
+    -- 深度统计
+    AVG(bid_depth_1pct) AS avg_bid_depth_1pct,
+    AVG(ask_depth_1pct) AS avg_ask_depth_1pct,
+    AVG(bid_depth_5pct) AS avg_bid_depth_5pct,
+    AVG(ask_depth_5pct) AS avg_ask_depth_5pct,
+    -- 名义价值
+    AVG(bid_notional_5pct) AS avg_bid_notional_5pct,
+    AVG(ask_notional_5pct) AS avg_ask_notional_5pct,
+    -- 失衡统计
+    AVG(imbalance) AS avg_imbalance,
+    MAX(imbalance) AS max_imbalance,
+    MIN(imbalance) AS min_imbalance,
+    -- 样本数
+    COUNT(*) AS sample_count
+FROM raw.crypto_order_book
+GROUP BY bucket, exchange, symbol
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('agg.order_book_1m',
+    start_offset => INTERVAL '1 hour',
+    end_offset => INTERVAL '1 minute',
+    schedule_interval => INTERVAL '1 minute',
+    if_not_exists => TRUE
+);
+
+COMMENT ON MATERIALIZED VIEW agg.order_book_1m IS '订单簿1分钟聚合 (价差/深度/失衡)';
+
+-- ============================================================
+-- 连续聚合视图: 订单簿 1 小时聚合
+-- 用途: 长周期流动性分析
+-- ============================================================
+CREATE MATERIALIZED VIEW IF NOT EXISTS agg.order_book_1h
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('1 hour', timestamp) AS bucket,
+    exchange,
+    symbol,
+    AVG(mid_price) AS avg_mid_price,
+    AVG(spread_bps) AS avg_spread_bps,
+    MAX(spread_bps) AS max_spread_bps,
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY spread_bps) AS p95_spread_bps,
+    AVG(bid_depth_5pct) AS avg_bid_depth_5pct,
+    AVG(ask_depth_5pct) AS avg_ask_depth_5pct,
+    AVG(bid_notional_5pct + ask_notional_5pct) AS avg_total_liquidity_5pct,
+    AVG(imbalance) AS avg_imbalance,
+    STDDEV(imbalance) AS std_imbalance,
+    COUNT(*) AS sample_count
+FROM raw.crypto_order_book
+GROUP BY bucket, exchange, symbol
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('agg.order_book_1h',
+    start_offset => INTERVAL '1 day',
+    end_offset => INTERVAL '1 hour',
+    schedule_interval => INTERVAL '1 hour',
+    if_not_exists => TRUE
+);
+
+COMMENT ON MATERIALIZED VIEW agg.order_book_1h IS '订单簿1小时聚合 (含 P95 价差)';
