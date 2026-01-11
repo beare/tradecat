@@ -69,11 +69,7 @@ def ensure_dirs():
 
 
 def get_env_file() -> Path:
-    """获取环境变量文件路径，优先使用 tradecat/config/.env"""
-    if ENV_FILE.exists():
-        return ENV_FILE
-    # 兼容旧路径
-    legacy_env = Path.home() / ".projects/fate-engine-env/.env"
-    if legacy_env.exists():
-        return legacy_env
+    """获取环境变量文件路径，统一使用 tradecat/config/.env"""
+    if not ENV_FILE.exists():
+        raise FileNotFoundError(f"配置文件不存在: {ENV_FILE}\n请复制 config/.env.example 为 config/.env 并填写配置")
     return ENV_FILE

@@ -17,10 +17,15 @@ from telegram.ext import (Application, CommandHandler, CallbackQueryHandler,
                           MessageHandler, filters, ContextTypes, ConversationHandler)
 from dotenv import load_dotenv
 from utils.timezone import now_cn, fmt_cn
+from _paths import (
+    get_env_file, BAZI_DB_DIR, LOGS_DIR, TXT_DIR, QUEUE_DIR, PROMPTS_DIR, ensure_dirs
+)
 
-load_dotenv(Path.home() / ".projects/fate-engine-env/.env")
-ADMIN_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "libs/database/bazi"))
+# 统一从 tradecat/config/.env 加载配置
+load_dotenv(get_env_file())
+# 兼容 TELEGRAM_CHAT_ID 和 ADMIN_USER_IDS
+ADMIN_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or (os.getenv("ADMIN_USER_IDS", "").split(",")[0] if os.getenv("ADMIN_USER_IDS") else None)
+sys.path.insert(0, str(BAZI_DB_DIR))
 
 from bazi_calculator import BaziCalculator
 from report_generator import generate_full_report

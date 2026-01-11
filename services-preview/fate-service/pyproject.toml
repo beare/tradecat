@@ -1,12 +1,12 @@
 [project]
-name = "order-service"
+name = "fate-service"
 version = "0.1.0"
-description = "Trading execution service for TradeCat - Avellaneda-Stoikov market making"
+description = "Fate calculation and analysis service for TradeCat - Chinese astrology and fortune telling"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "TradeCat Team" }]
-keywords = ["trading", "market-making", "crypto", "execution"]
+keywords = ["fate", "bazi", "astrology", "chinese-calendar"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -14,10 +14,12 @@ classifiers = [
 ]
 
 dependencies = [
-    "ccxt>=4.0.0",
-    "cryptofeed>=2.4.0",
-    "aiohttp>=3.9.0",
+    "python-telegram-bot>=20.0",
     "python-dotenv>=1.0.0",
+    "httpx>=0.25.0",
+    "aiohttp>=3.9.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]
@@ -30,21 +32,18 @@ dev = [
     "ipython>=8.0.0",
 ]
 
-[project.scripts]
-order-service = "src.__main__:main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["services", "libs"]
 
 # ==================== Ruff ====================
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-src = ["src", "tests"]
+src = ["services", "libs", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -62,7 +61,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["src"]
+known-first-party = ["services", "libs"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -70,7 +69,7 @@ indent-style = "space"
 
 # ==================== Pytest ====================
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["services/telegram-service/tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 addopts = ["-v", "--tb=short"]
@@ -81,7 +80,7 @@ markers = [
 
 # ==================== Coverage ====================
 [tool.coverage.run]
-source = ["src"]
+source = ["services", "libs"]
 branch = true
 omit = ["tests/*", "*/__pycache__/*"]
 
