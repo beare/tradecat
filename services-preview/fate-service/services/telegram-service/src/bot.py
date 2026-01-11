@@ -834,19 +834,18 @@ def _calc_and_save_report(d: dict, lng: float, lat: float, user_id: str):
     
     report_txt = generate_full_report(result, hide=REPORT_HIDE)
 
-    out_dir = Path(__file__).parent.parent / "output" / "txt"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    TXT_DIR.mkdir(parents=True, exist_ok=True)
     gender_cn = "男" if d["gender"] == "male" else "女"
     filename = f"{d['birth_date']}-{d['birth_time']}-{d.get('birth_place','未知')}-{d.get('name') or '命主'}-{gender_cn}.txt".replace(" ", "")
-    out_path = out_dir / filename
+    out_path = TXT_DIR / filename
     out_path.write_text(report_txt, encoding="utf-8")
 
     # AI 分析版：在原报告前拼接提示词
-    prompt_path = Path(__file__).parent / "prompts" / "快速版.md"
+    prompt_path = PROMPTS_DIR / "快速版.md"
     prompt_text = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else ""
     ai_report_txt = f"{prompt_text}\n\n{report_txt}"
     ai_filename = filename.replace(".txt", "-ai分析版.txt")
-    ai_path = out_dir / ai_filename
+    ai_path = TXT_DIR / ai_filename
     ai_path.write_text(ai_report_txt, encoding="utf-8")
 
     db.save_record(user_id=str(user_id), biz_type="bazi", name=d.get("name"),
