@@ -90,10 +90,15 @@ def check_dependencies() -> dict:
     
     # 可选的外部库
     optional = [
-        (FORTEL_ZIWEI_DIR, "fortel-ziweidoushu 库"),
-        (DANTALION_DIR, "dantalion 库"),
-        (IZTRO_DIR, "iztro 库"),
-        (CHINESE_DIVINATION_DIR, "Chinese-Divination 库"),
+        (FORTEL_ZIWEI_DIR, "fortel-ziweidoushu 库（紫微斗数）"),
+        (DANTALION_DIR, "dantalion 库（现代八字）"),
+        (IZTRO_DIR, "iztro 库（紫微斗数）"),
+        (MIKABOSHI_DIR, "mikaboshi 库（风水罗盘）"),
+        (CHINESE_DIVINATION_DIR, "Chinese-Divination 库（六爻梅花）"),
+        (ICHING_DIR, "Iching 库（易经）"),
+        (HOLIDAY_CALENDAR_DIR, "holiday-calendar（黄历）"),
+        (CHINESE_CALENDAR_DIR, "chinese-calendar（农历）"),
+        (JS_ASTRO_DIR, "js_astro 库（天文）"),
     ]
     
     for path, name in required:

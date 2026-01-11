@@ -125,13 +125,13 @@ run: install
 	cd services/telegram-service && $(PYTHON) start.py
 
 start:
-	./scripts/start.sh start
+	./services/telegram-service/scripts/start.sh start
 
 stop:
-	./scripts/start.sh stop
+	./services/telegram-service/scripts/start.sh stop
 
 status:
-	./scripts/start.sh status
+	./services/telegram-service/scripts/start.sh status
 
 restart:
-	./scripts/start.sh restart
+	./services/telegram-service/scripts/start.sh restart

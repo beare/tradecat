@@ -19,8 +19,8 @@ backups/
 .vscode/
 *.swp
 *.swo
-libs/external/github/
-libs/external/web
+# libs/external/github/  # 外部库需要提交
+# libs/external/web      # 外部资源需要提交
 *.gz
 *.zip
 .history/
