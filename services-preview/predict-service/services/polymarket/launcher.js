@@ -13,25 +13,17 @@ console.log('🤖 Polymarket Signal Bot');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
 // 检查配置文件
-const envPath = path.join(__dirname, '.env');
+// 统一使用 tradecat/config/.env
+const projectRoot = path.resolve(__dirname, '../../../../../');
+const envPath = path.join(projectRoot, 'config', '.env');
 if (!fs.existsSync(envPath)) {
-    console.log('⚠️  首次运行检测');
+    console.log('⚠️  配置文件不存在');
     console.log('');
-    console.log('请先配置 .env 文件:');
-    console.log('1. 从 @BotFather 获取 Telegram Bot Token');
-    console.log('2. 获取你的 Chat ID');
-    console.log('3. 编辑 bot/.env 文件填入配置');
+    console.log('请先配置 tradecat/config/.env:');
+    console.log('1. cp config/.env.example config/.env');
+    console.log('2. 编辑 config/.env 填入 BOT_TOKEN 等配置');
     console.log('');
-    console.log('详见: bot/.env.example');
-    console.log('');
-
-    // 创建示例配置
-    const examplePath = path.join(__dirname, '.env.example');
-    if (fs.existsSync(examplePath)) {
-        fs.copyFileSync(examplePath, envPath);
-        console.log('✅ 已创建 .env 文件模板');
-        console.log('路径:', envPath);
-    }
+    console.log('路径:', envPath);
 
     console.log('');
     console.log('配置完成后,请重新运行本程序');

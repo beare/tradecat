@@ -5,8 +5,9 @@
  */
 
 const path = require('path');
-// 支持自定义 .env 路径
-const dotenvPath = process.env.DOTENV_CONFIG_PATH || path.join(__dirname, '../.env');
+// 统一使用 tradecat/config/.env
+const projectRoot = path.resolve(__dirname, '../../../../../../');
+const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath });
 
 module.exports = {
