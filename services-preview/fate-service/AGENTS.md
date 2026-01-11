@@ -65,14 +65,47 @@ fate-service/
 │   │   ├── bazi.db                 # SQLite 数据库（自动创建）
 │   │   ├── db_v2.py                # 数据库操作（含 ensure_db）
 │   │   └── schema_v2.sql           # 数据库 schema
-│   └── external/github/            # 外部命理库（只读）
-│       ├── lunar-python-master/
-│       ├── bazi-1-master/
-│       ├── sxwnl-master/
-│       ├── fortel-ziweidoushu-main/
-│       └── ...
+│   └── external/                   # 外部依赖（来自 GitHub 开源项目，只读）
+│       ├── github/                 # GitHub 克隆的命理库（53个）
+│       │   ├── lunar-python-master/
+│       │   ├── bazi-1-master/
+│       │   ├── sxwnl-master/
+│       │   ├── fortel-ziweidoushu-main/
+│       │   └── ...
+│       ├── web/                    # 网页资源
+│       └── README.md               # 外部库说明文档
 └── tests/                          # 测试目录
 ```
+
+---
+
+## 外部依赖库（来自 GitHub）
+
+所有外部库从 GitHub 克隆，存放在 `libs/external/github/`，**禁止修改**。
+
+### 必需依赖
+
+| 库名 | 目录 | GitHub 来源 | 语言 |
+|------|------|-------------|------|
+| lunar-python | `lunar-python-master` | [6tail/lunar-python](https://github.com/6tail/lunar-python) | Python |
+| bazi-1 | `bazi-1-master` | [nicktaobo/bazi-1](https://github.com/nicktaobo/bazi-1) | Python |
+| sxwnl | `sxwnl-master` | [nicktaobo/sxwnl](https://github.com/nicktaobo/sxwnl) | JavaScript |
+
+### 可选依赖
+
+| 库名 | 目录 | GitHub 来源 | 语言 |
+|------|------|-------------|------|
+| fortel-ziweidoushu | `fortel-ziweidoushu-main` | [fortelzhao/fortel-ziweidoushu](https://github.com/nicktaobo/fortel-ziweidoushu) | TypeScript |
+| iztro | `iztro-main` | [SylarLong/iztro](https://github.com/SylarLong/iztro) | TypeScript |
+| dantalion | `dantalion-master` | [nicktaobo/dantalion](https://github.com/nicktaobo/dantalion) | TypeScript |
+| mikaboshi | `mikaboshi-main` | [nicktaobo/mikaboshi](https://github.com/nicktaobo/mikaboshi) | Rust |
+| Chinese-Divination | `Chinese-Divination-master` | GitHub | Python |
+| Iching | `Iching-master` | GitHub | Python |
+| holiday-calendar | `holiday-and-chinese-almanac-calendar-main` | GitHub | ICS |
+| chinese-calendar | `chinese-calendar-master` | [LKI/chinese-calendar](https://github.com/LKI/chinese-calendar) | Python |
+| js_astro | `js_astro-master` | GitHub | JavaScript |
+
+> 完整列表和使用说明见 `libs/external/README.md`
 
 ---
 

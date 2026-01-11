@@ -108,9 +108,36 @@ fate-service/
 ├── libs/
 │   ├── data/                   # 数据文件（城市坐标等）
 │   ├── database/bazi/          # SQLite 数据库
-│   └── external/github/        # 外部命理库
+│   └── external/               # 外部依赖（来自 GitHub 开源项目）
+│       ├── github/             # GitHub 克隆的命理库
+│       └── web/                # 网页资源
 └── docs/                       # 文档
 ```
+
+## 外部依赖库
+
+本项目依赖多个 GitHub 开源命理库，已克隆到 `libs/external/github/` 目录：
+
+### 必需依赖
+
+| 库名 | GitHub 来源 | 用途 |
+|------|-------------|------|
+| lunar-python | [6tail/lunar-python](https://github.com/6tail/lunar-python) | 核心历法计算 |
+| bazi-1 | [bazi-1/bazi](https://github.com/nicktaobo/bazi-1) | 八字神煞格局 |
+| sxwnl | [sxwnl/sxwnl](https://github.com/nicktaobo/sxwnl) | 寿星万年历 |
+
+### 可选依赖
+
+| 库名 | GitHub 来源 | 用途 |
+|------|-------------|------|
+| fortel-ziweidoushu | [fortelzhao/fortel-ziweidoushu](https://github.com/nicktaobo/fortel-ziweidoushu) | 紫微斗数 |
+| iztro | [SylarLong/iztro](https://github.com/SylarLong/iztro) | 紫微斗数 |
+| dantalion | [nicktaobo/dantalion](https://github.com/nicktaobo/dantalion) | 现代八字分析 |
+| mikaboshi | [nicktaobo/mikaboshi](https://github.com/nicktaobo/mikaboshi) | 风水罗盘 |
+| Chinese-Divination | GitHub | 六爻/梅花易数 |
+| Iching | GitHub | 易经系统 |
+
+> 详细说明见 `libs/external/README.md`
 
 ## 常用命令
 
