@@ -705,6 +705,7 @@ class BaziCalculator:
         return obj
     
     def calculate_complete(self) -> Dict[str, Any]:
+        result = {}
         
         # Phase 1: 寿星万年历高精度历法
         spec = importlib.util.spec_from_file_location("sxwnl_integration", str(SRC_DIR / "sxwnl_integration.py"))

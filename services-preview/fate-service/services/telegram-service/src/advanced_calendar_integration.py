@@ -199,7 +199,8 @@ class AdvancedCalendarCalculator:
         # 验证年份一致性：DTSTART 的 year 必须覆盖当前年份
         years = {(_ics_dtstart_to_date(e.dtstart).year) for e in events}
         if self.dt.year not in years:
-            raise RuntimeError(f"ICS 数据不覆盖当前年份: dt.year={self.dt.year} icsYears={sorted(years)}")
+            # 日历数据不覆盖当前年份时，返回空结果而非报错
+            return {}
 
         today = self.dt.date()
         today_evt: Optional[_IcsEvent] = None

@@ -18,13 +18,16 @@ from telegram.ext import (Application, CommandHandler, CallbackQueryHandler,
 from dotenv import load_dotenv
 from utils.timezone import now_cn, fmt_cn
 from _paths import (
-    get_env_file, BAZI_DB_DIR, LOGS_DIR, TXT_DIR, QUEUE_DIR, PROMPTS_DIR, ensure_dirs
+    get_env_file, BAZI_DB_DIR, LOGS_DIR, TXT_DIR, QUEUE_DIR, PROMPTS_DIR, 
+    ensure_dirs, startup_check
 )
+
+# 启动检查（目录、依赖、配置）
+startup_check()
 
 # 统一从 tradecat/config/.env 加载配置
 load_dotenv(get_env_file())
-# 兼容 TELEGRAM_CHAT_ID 和 ADMIN_USER_IDS
-ADMIN_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or (os.getenv("ADMIN_USER_IDS", "").split(",")[0] if os.getenv("ADMIN_USER_IDS") else None)
+ADMIN_CHAT_ID = (os.getenv("FATE_ADMIN_USER_IDS") or "").split(",")[0] or None
 sys.path.insert(0, str(BAZI_DB_DIR))
 
 from bazi_calculator import BaziCalculator
@@ -33,6 +36,9 @@ from report_generator import DEFAULT_HIDE as REPORT_HIDE
 from location import get as get_location, get_coords
 import db_v2 as db
 from rate_limiter import check_rate_limit, record_request, acquire_slot, release_slot, get_queue_status
+
+# 自动初始化数据库
+db.ensure_db()
 
 INPUT, CONFIRM = range(2)
 
@@ -898,9 +904,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    token = os.getenv("FATE_BOT_TOKEN")
     if not token:
-        print("错误: 未设置 TELEGRAM_BOT_TOKEN")
+        print("错误: 未设置 FATE_BOT_TOKEN (请在 config/.env 中配置)")
         return
     
     async def post_init(app: Application):

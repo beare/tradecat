@@ -36,7 +36,7 @@ ICHING_DIR = EXTERNAL_LIBS_DIR / "Iching-master"
 HOLIDAY_CALENDAR_DIR = EXTERNAL_LIBS_DIR / "holiday-and-chinese-almanac-calendar-main"
 CHINESE_CALENDAR_DIR = EXTERNAL_LIBS_DIR / "chinese-calendar-master"
 JS_ASTRO_DIR = EXTERNAL_LIBS_DIR / "js_astro-master"
-DANTALION_DIR = EXTERNAL_LIBS_DIR / "dantalion-main"
+DANTALION_DIR = EXTERNAL_LIBS_DIR / "dantalion-master"
 
 # 服务内部路径
 SRC_DIR = SERVICE_ROOT / "src"
@@ -73,3 +73,68 @@ def get_env_file() -> Path:
     if not ENV_FILE.exists():
         raise FileNotFoundError(f"配置文件不存在: {ENV_FILE}\n请复制 config/.env.example 为 config/.env 并填写配置")
     return ENV_FILE
+
+
+def check_dependencies() -> dict:
+    """检查所有依赖是否就绪，返回检查结果"""
+    results = {"ok": True, "errors": [], "warnings": []}
+    
+    # 必须存在的目录/文件
+    required = [
+        (ENV_FILE, "配置文件"),
+        (LUNAR_PYTHON_DIR, "lunar-python 库"),
+        (BAZI_1_DIR, "bazi-1 库"),
+        (SXWNL_DIR, "sxwnl 库"),
+        (CHINA_COORDS_CSV, "城市坐标数据"),
+    ]
+    
+    # 可选的外部库
+    optional = [
+        (FORTEL_ZIWEI_DIR, "fortel-ziweidoushu 库"),
+        (DANTALION_DIR, "dantalion 库"),
+        (IZTRO_DIR, "iztro 库"),
+        (CHINESE_DIVINATION_DIR, "Chinese-Divination 库"),
+    ]
+    
+    for path, name in required:
+        if not path.exists():
+            results["ok"] = False
+            results["errors"].append(f"缺少必需依赖: {name} ({path})")
+    
+    for path, name in optional:
+        if not path.exists():
+            results["warnings"].append(f"缺少可选依赖: {name} ({path})")
+    
+    # 检查环境变量
+    if ENV_FILE.exists():
+        from dotenv import dotenv_values
+        config = dotenv_values(ENV_FILE)
+        if not config.get("FATE_BOT_TOKEN"):
+            results["ok"] = False
+            results["errors"].append("未配置 FATE_BOT_TOKEN")
+    
+    return results
+
+
+def startup_check():
+    """启动时执行完整检查"""
+    print("[fate-service] 启动检查...")
+    
+    # 1. 确保目录存在
+    ensure_dirs()
+    print("  ✅ 目录结构已就绪")
+    
+    # 2. 检查依赖
+    results = check_dependencies()
+    
+    for warn in results["warnings"]:
+        print(f"  ⚠️  {warn}")
+    
+    if not results["ok"]:
+        print("  ❌ 启动检查失败:")
+        for err in results["errors"]:
+            print(f"     - {err}")
+        raise RuntimeError("依赖检查失败，请修复后重试")
+    
+    print("  ✅ 依赖检查通过")
+    return True

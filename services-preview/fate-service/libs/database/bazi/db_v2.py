@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Dict, List
 
 DB_PATH = Path(__file__).parent / "bazi.db"
+_initialized = False
 
 
 def get_conn():
@@ -14,10 +15,35 @@ def get_conn():
 
 
 def init_db():
+    """初始化数据库表结构"""
     conn = get_conn()
     conn.executescript(open(Path(__file__).parent / "schema_v2.sql").read())
     conn.commit()
     conn.close()
+
+
+def ensure_db():
+    """确保数据库已初始化（自动检测，启动时调用）"""
+    global _initialized
+    if _initialized:
+        return
+    
+    # 确保目录存在
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    
+    # 检查表是否存在
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='records'")
+    exists = cur.fetchone() is not None
+    conn.close()
+    
+    if not exists:
+        print("[DB] 初始化数据库表...")
+        init_db()
+        print("[DB] 数据库初始化完成")
+    
+    _initialized = True
 
 
 def save_record(
