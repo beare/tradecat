@@ -1,12 +1,12 @@
--- 连续聚合视图：由 1m 基础数据实时合成 3m~1M
--- 任何节点只需执行一次即可建好全部 Timescale Continuous Aggregate
+-- 连续聚合视图：由 1m 基础数据实时合成多周期 K 线
+-- 仅保留核心周期：5m, 15m, 1h, 4h, 1d, 1w
+-- start_offset = NULL 表示刷新全部可用数据
 
 SET search_path TO market_data, public;
 
 CREATE OR REPLACE FUNCTION market_data._创建连续聚合(
     p_view_name       TEXT,
     p_bucket_interval INTERVAL,
-    p_start_offset    INTERVAL,
     p_end_offset      INTERVAL,
     p_schedule        INTERVAL
 ) RETURNS VOID
@@ -46,10 +46,11 @@ BEGIN
         $fmt$, p_view_name, p_bucket_interval, p_bucket_interval);
     END IF;
 
+    -- start_offset => NULL 表示刷新全部历史数据
     BEGIN
         EXECUTE format(
-            'SELECT add_continuous_aggregate_policy(''market_data.%I'', start_offset => %L::interval, end_offset => %L::interval, schedule_interval => %L::interval);',
-            p_view_name, p_start_offset, p_end_offset, p_schedule
+            'SELECT add_continuous_aggregate_policy(''market_data.%I'', start_offset => NULL, end_offset => %L::interval, schedule_interval => %L::interval);',
+            p_view_name, p_end_offset, p_schedule
         );
     EXCEPTION WHEN duplicate_object THEN
         NULL;
@@ -63,23 +64,15 @@ DECLARE
 BEGIN
     FOR cfg IN
         SELECT * FROM (VALUES
-            -- 生产环境实际策略：全部视图 1 分钟调度，end_offset 固定 1 分钟
-            ('candles_3m',  '3 minutes'::interval,  '7 days'::interval,   '1 minute'::interval,   '1 minute'::interval),
-            ('candles_5m',  '5 minutes',            '7 days',             '1 minute',             '1 minute'),
-            ('candles_15m', '15 minutes',           '7 days',             '1 minute',             '1 minute'),
-            ('candles_30m', '30 minutes',           '7 days',             '1 minute',             '1 minute'),
-            ('candles_1h',  '1 hour',               '7 days',             '1 minute',             '1 minute'),
-            ('candles_2h',  '2 hours',              '7 days',             '1 minute',             '1 minute'),
-            ('candles_4h',  '4 hours',              '7 days',             '1 minute',             '1 minute'),
-            ('candles_6h',  '6 hours',              '7 days',             '1 minute',             '1 minute'),
-            ('candles_8h',  '8 hours',              '7 days',             '1 minute',             '1 minute'),
-            ('candles_12h', '12 hours',             '7 days',             '1 minute',             '1 minute'),
-            ('candles_1d',  '1 day',                '14 days',            '1 minute',             '1 minute'),
-            ('candles_3d',  '3 days',               '14 days',            '1 minute',             '1 minute'),
-            ('candles_1w',  '7 days',               '30 days',            '1 minute',             '1 minute'),
-            ('candles_1M',  '1 month',              '90 days',            '1 minute',             '1 minute')
-        ) AS t(view_name, bucket_interval, start_offset, end_offset, schedule_interval)
+            -- 核心周期：start_offset = NULL（刷新全部），end_offset = 1分钟，schedule = 1分钟
+            ('candles_5m',  '5 minutes'::interval,  '1 minute'::interval, '1 minute'::interval),
+            ('candles_15m', '15 minutes',           '1 minute',           '1 minute'),
+            ('candles_1h',  '1 hour',               '1 minute',           '1 minute'),
+            ('candles_4h',  '4 hours',              '1 minute',           '1 minute'),
+            ('candles_1d',  '1 day',                '1 minute',           '1 minute'),
+            ('candles_1w',  '7 days',               '1 minute',           '1 minute')
+        ) AS t(view_name, bucket_interval, end_offset, schedule_interval)
     LOOP
-        PERFORM market_data._创建连续聚合(cfg.view_name, cfg.bucket_interval, cfg.start_offset, cfg.end_offset, cfg.schedule_interval);
+        PERFORM market_data._创建连续聚合(cfg.view_name, cfg.bucket_interval, cfg.end_offset, cfg.schedule_interval);
     END LOOP;
 END$$;
