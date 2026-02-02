@@ -278,7 +278,9 @@ cmd_daemon() {
     done
     
     # 后台启动守护循环
-    daemon_loop &
+    # 注意：必须断开 stdout/stderr，避免被上层脚本通过管道调用时（如 `./scripts/start.sh start | sed ...`）
+    # 因后台进程继承管道写端导致管道永不关闭、上层启动脚本卡死。
+    daemon_loop >/dev/null 2>&1 &
     echo $! > "$DAEMON_PID"
     log "守护进程已启动 (PID: $!)"
     echo "守护进程已启动 (PID: $!)"

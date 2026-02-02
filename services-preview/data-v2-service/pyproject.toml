@@ -1,0 +1,53 @@
+[project]
+name = "data-v2-service"
+version = "0.1.0"
+description = "Preview market data collector (REST/WS) with union-of-fields schema"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "TradeCat Team" }]
+
+dependencies = [
+    "ccxt>=4.5.0",
+    "aiohttp>=3.9.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+
+[project.scripts]
+data-v2-service = "src.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-q"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+

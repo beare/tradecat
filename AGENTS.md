@@ -199,7 +199,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 - **配置统一**：所有配置集中在 `config/.env`，各服务共用
 - **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram/ai/signal/vis`
 
-### 4.2 服务清单（14 个）
+### 4.2 服务清单（15 个）
 
 | 服务 | 位置 | 职责 | 入口 |
 |:---|:---|:---|:---|
@@ -215,6 +215,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 | order-service | services-preview/ | 交易执行 | `src/__main__.py` |
 | predict-service | services-preview/ | 预测市场（Node.js） | `services/*/` |
 | fate-service | services-preview/ | 命理服务（端口 8001） | `services/telegram-service/` |
+| data-v2-service | services-preview/ | 行情采集 v2（REST/WS + 全字段并集） | `src/__main__.py` |
 | nofx-dev | services-preview/ | NOFX AI 交易系统（预览） | `main.go` |
 | datacat-service | services-preview/ | 数据采集基建（分层预览） | `src/__main__.py` |
 
@@ -350,9 +351,10 @@ tradecat/
 │   ├── ai-service/                 # AI 分析
 │   └── signal-service/             # 信号检测（129条规则）
 │
-├── services-preview/               # 预览版微服务 (7个)
+├── services-preview/               # 预览版微服务 (8个)
 │   ├── api-service/                # REST API 服务（端口 8000）
 │   ├── datacat-service/            # 数据采集基建（分层预览）
+│   ├── data-v2-service/            # 行情采集 v2（REST/WS + 全字段并集）
 │   ├── markets-service/            # 全市场数据采集
 │   ├── vis-service/                # 可视化渲染（端口 8087）
 │   ├── order-service/              # 交易执行
@@ -746,3 +748,5 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 - 2026-01-28: 新增信号相关性分析脚本与文档，输出分析产物目录。
 - 2026-01-29: 新增宣传材料与比赛汇报材料文档。
 - 2026-01-29: Tradecat Preview API 新增 `/api/futures/base-data`（直读 SQLite 基础数据）。
+- 2026-02-01: 修复 data-service K线 REST 补齐在部分返回为字符串时间戳时的崩溃；新增 trading-service 类比预测脚本（15m 全历史检索相似窗口并输出未来分布）。
+- 2026-02-01: 新增 trading-service K线质量报告脚本（全历史缺口与近30天日条数校验），用于启动预测前的“是否齐全”自检。

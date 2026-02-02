@@ -137,6 +137,11 @@ def to_rows(exchange: str, symbol: str, candles: List[List], source: str = "ccxt
     for c in candles:
         if len(c) < 6:
             continue
+        try:
+            open_time_ms = int(c[0])
+        except (TypeError, ValueError):
+            # 兼容 ccxt / Binance 原生返回里时间戳为 str/None 的情况
+            continue
         # Binance 原生 klines: [openTime, open, high, low, close, volume, closeTime, quoteVolume, trades, takerBuyVol, takerBuyQuote, ...]
         quote_volume = None
         trade_count = None
@@ -149,7 +154,7 @@ def to_rows(exchange: str, symbol: str, candles: List[List], source: str = "ccxt
             taker_buy_quote_volume = float(c[10]) if c[10] not in (None, "") else None
         rows.append({
             "exchange": exchange, "symbol": symbol.upper(),
-            "bucket_ts": datetime.fromtimestamp(c[0] / 1000, tz=timezone.utc),
+            "bucket_ts": datetime.fromtimestamp(open_time_ms / 1000, tz=timezone.utc),
             "open": float(c[1]), "high": float(c[2]), "low": float(c[3]),
             "close": float(c[4]), "volume": float(c[5]),
             "quote_volume": quote_volume, "trade_count": trade_count, "is_closed": True, "source": source,
