@@ -190,6 +190,9 @@ msgstr "🧠Advanced"
 msgid "panel.pattern"
 msgstr "🕯️Pattern"
 
+msgid "panel.recommend"
+msgstr "🤖Smart"
+
 # ============ Market Type ============
 msgid "market.spot"
 msgstr "Spot"

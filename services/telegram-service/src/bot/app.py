@@ -1120,6 +1120,29 @@ class DataManager:
 class UserRequestHandler:
     """专门处理用户请求的轻量级处理器 - 只读取缓存，不进行网络请求"""
 
+    # ==================== 排行榜卡片分组 ====================
+    # 现有分组：basic / futures / advanced 通过模块路径自动归类
+    # 新增分组：recommend 为“智能推荐”虚拟分组，只做 card_id 映射，不复制卡片对象，也不改变原分组行为
+    RANKING_GROUP_RECOMMEND = "recommend"
+
+    # 智能推荐：显式指定展示顺序（仅影响 recommend 分组）
+    RECOMMENDED_CARD_ORDER: list[str] = [
+        # ---- 你指定的卡片 ----
+        "super_trend_ranking",      # 📐 超级趋势
+        "ema_ranking",              # 🧮 EMA
+        "vpvr_ranking",             # 🏛️ VPVR
+        "vwap_ranking",             # 📏 VWAP
+        "cvd_ranking",              # 🧾 CVD
+        "candle_pattern_ranking",   # 🕯️ 形态
+        "trendline_ranking",        # 📈 趋势线
+        # ---- 我补充的推荐（你可以随时删/换）----
+        "liquidity_ranking",        # 💧 流动性
+        "mfi_ranking",              # 🧪 MFI
+        "atr_ranking",              # 🌪️ ATR
+        "macd_ranking",             # 🧲 MACD柱
+        "rsi_harmonic_ranking",     # 🧩 RSI谐波
+    ]
+
     def __init__(self, card_registry: Optional[RankingRegistry] = None):
         # 用户状态管理
         self.user_states = {
@@ -1158,7 +1181,7 @@ class UserRequestHandler:
             'basic_market_limit': 10,
             'basic_market_type': 'futures',
             # 排行榜卡片分组：basic / futures / advanced
-            'ranking_group': 'basic',
+            'ranking_group': self.RANKING_GROUP_RECOMMEND,
         }
 
         # 排行榜卡片注册表（可选）
@@ -1408,17 +1431,31 @@ class UserRequestHandler:
             return "basic"
         return "basic"  # 默认归入基础
 
+    @classmethod
+    def _iter_recommended_cards(cls, registry: RankingRegistry) -> list:
+        """获取 recommend 分组卡片：映射到原卡片实例，不复制、不改动原分组。"""
+        cards_by_id = {c.card_id: c for c in registry.iter_cards()}
+        cards = []
+        for cid in cls.RECOMMENDED_CARD_ORDER:
+            card = cards_by_id.get(cid)
+            if card is not None:
+                cards.append(card)
+        return cards
+
 
     def get_ranking_menu_keyboard(self, update=None) -> InlineKeyboardMarkup:
         """排行榜二级菜单：列出所有已注册的排行榜卡片"""
         registry = self.card_registry or ensure_ranking_registry()
-        current_group = self.user_states.get("ranking_group", "basic")
+        current_group = self.user_states.get("ranking_group", self.RANKING_GROUP_RECOMMEND)
         lang = _resolve_lang(update) if update else I18N.default_locale
 
         buttons: List[InlineKeyboardButton] = []
         if registry:
-            cards = [c for c in registry.iter_cards() if self._card_group(c) == current_group]
-            cards.sort(key=lambda c: (c.priority, c.button_text))
+            if current_group == self.RANKING_GROUP_RECOMMEND:
+                cards = self._iter_recommended_cards(registry)
+            else:
+                cards = [c for c in registry.iter_cards() if self._card_group(c) == current_group]
+                cards.sort(key=lambda c: (c.priority, c.button_text))
             buttons = [self._build_card_button(card, update) for card in cards]
 
         rows = self._chunk_buttons(buttons, chunk_size=3) if buttons else []
@@ -1435,11 +1472,14 @@ class UserRequestHandler:
             prefix = "✅" if active else ""
             return InlineKeyboardButton(f"{prefix}{text}", callback_data=f"ranking_menu_group_{value}")
 
-        rows.append([
-            _group_btn("panel.basic", "basic"),
-            _group_btn("panel.futures", "futures"),
-            _group_btn("panel.advanced", "advanced"),
-        ])
+        rows.append(
+            [
+                _group_btn("panel.recommend", self.RANKING_GROUP_RECOMMEND),
+                _group_btn("panel.futures", "futures"),
+                _group_btn("panel.basic", "basic"),
+                _group_btn("panel.advanced", "advanced"),
+            ]
+        )
 
         rows.append([
             InlineKeyboardButton(I18N.gettext("menu.home", lang=lang), callback_data="main_menu"),
@@ -3825,7 +3865,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 特殊处理：如果用户在AI对话中点击了其他功能按钮，强制结束AI对话状态
-    if query.data in ["ranking_menu", "ranking_menu_group_basic", "ranking_menu_group_futures", "ranking_menu_group_advanced", "position_ranking", "funding_rate", "volume_ranking", "basic_market", "market_sentiment", "liquidation_ranking", "money_flow", "market_depth"]:
+    if query.data in [
+        "ranking_menu",
+        "ranking_menu_group_recommend",
+        "ranking_menu_group_basic",
+        "ranking_menu_group_futures",
+        "ranking_menu_group_advanced",
+        "position_ranking",
+        "funding_rate",
+        "volume_ranking",
+        "basic_market",
+        "market_sentiment",
+        "liquidation_ranking",
+        "money_flow",
+        "market_depth",
+    ]:
         # 清理可能的AI对话状态
         if 'selected_symbol' in context.user_data:
             del context.user_data['selected_symbol']
@@ -3982,7 +4036,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
         elif query.data == "ranking_menu":
-            current_group = user_handler.user_states.get("ranking_group", "basic")
+            current_group = user_handler.user_states.get("ranking_group", UserRequestHandler.RANKING_GROUP_RECOMMEND)
             keyboard = user_handler.get_ranking_menu_keyboard(update)
             await query.edit_message_text(
                 _build_ranking_menu_text(current_group, update),
@@ -3992,9 +4046,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif query.data.startswith("ranking_menu_group_"):
             group = query.data.replace("ranking_menu_group_", "")
-            if group in {"basic", "futures", "advanced"}:
+            if group in {UserRequestHandler.RANKING_GROUP_RECOMMEND, "basic", "futures", "advanced"}:
                 user_handler.user_states["ranking_group"] = group
-            current_group = user_handler.user_states.get("ranking_group", "basic")
+            current_group = user_handler.user_states.get("ranking_group", UserRequestHandler.RANKING_GROUP_RECOMMEND)
             keyboard = user_handler.get_ranking_menu_keyboard(update)
             await query.edit_message_text(
                 _build_ranking_menu_text(current_group, update),
@@ -5922,7 +5976,10 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
             elif action == "ranking_menu":
                 # 数据面板入口：显示榜单列表
-                text = _build_ranking_menu_text(user_handler.user_states.get("ranking_group", "basic"), update)
+                text = _build_ranking_menu_text(
+                    user_handler.user_states.get("ranking_group", UserRequestHandler.RANKING_GROUP_RECOMMEND),
+                    update,
+                )
                 keyboard = user_handler.get_ranking_menu_keyboard(update)
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 

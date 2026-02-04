@@ -190,6 +190,9 @@ msgstr "🧠高级"
 msgid "panel.pattern"
 msgstr "🕯️形态"
 
+msgid "panel.recommend"
+msgstr "🤖智能推荐"
+
 # ============ 市场类型 ============
 msgid "market.spot"
 msgstr "现货"
