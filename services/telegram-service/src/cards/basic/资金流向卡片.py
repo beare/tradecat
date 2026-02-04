@@ -36,7 +36,7 @@ class MoneyFlowCard(RankingCard):
                 "money_flow_limit": 10,
                 "money_flow_period": "15m",
                 "money_flow_sort": "desc",
-                "money_flow_type": "volume",   # 默认按成交额排序
+                "money_flow_type": "absolute",   # 默认按净流排序（周期切换必须有差异）
                 "money_flow_market": "futures",
                 "money_flow_fields": {},
             },
@@ -297,48 +297,55 @@ class MoneyFlowCard(RankingCard):
             except Exception:
                 return None
 
-        allowed = MONEY_FLOW_SPOT_PERIODS if market == "spot" else MONEY_FLOW_FUTURES_PERIODS
-        period = normalize_period(period, allowed, default="15m")
+        # 资金流向的“周期”必须真能影响数据，否则用户点击周期会感觉“没刷新”。
+        # 之前从「基础数据」表直接读资金流向字段，实测多个周期数值被上游写成同一份快照，导致周期切换无差异。
+        # 这里改为以「CVD信号排行榜」为主数据源（按周期分桶），让周期切换真正影响榜单排序与数值。
+        allowed = DEFAULT_PERIODS
+        if period == "1m" and "1m" in allowed:
+            period = "1m"
+        else:
+            period = normalize_period(period, allowed, default="15m")
         handler.user_states["money_flow_period"] = period
 
         items: List[Dict] = []
 
-        # 从基础数据表读取
         try:
-            base_map = self.provider.fetch_base(period)
-            # 若当前周期净流相关字段为空，回退到该字段最近的非空时间片
-            if flow_type in {"absolute", "inflow", "outflow"}:
-                def _pick_flow_value(row: Dict) -> float | None:
-                    if flow_type == "absolute":
-                        return _to_float_or_none(row.get("资金流向"))
-                    if flow_type == "inflow":
-                        return _to_float_or_none(row.get("主动买额") or row.get("主动买入额"))
-                    return _to_float_or_none(row.get("主动卖出额") or row.get("主动卖额"))
+            # 主数据：CVD（按周期统计）
+            cvd_rows = self.provider.fetch_metric("CVD榜单", period)
+            # 辅助数据：基础数据（补齐价格/成交额等展示字段）
+            base_map = self.provider.fetch_base(period) or {}
 
-                has_flow = any(_pick_flow_value(r) is not None for r in base_map.values())
-                if not has_flow:
-                    field_map = {
-                        "absolute": "资金流向",
-                        "inflow": "主动买额",
-                        "outflow": "主动卖出额",
+            for r in cvd_rows:
+                sym_raw = str(r.get("交易对") or r.get("symbol") or "").upper()
+                if not sym_raw:
+                    continue
+                base = base_map.get(sym_raw, {}) if isinstance(base_map, dict) else {}
+
+                cvd_val = _to_float_or_none(r.get("CVD值"))
+                if cvd_val is None:
+                    continue
+
+                price = _to_float_or_none(base.get("当前价格"))
+                quote_volume = _to_float_or_none(base.get("成交额"))
+
+                items.append(
+                    {
+                        "symbol": format_symbol(sym_raw),
+                        # special
+                        "absolute": cvd_val,
+                        "volume": quote_volume,
+                        "inflow": cvd_val if cvd_val > 0 else None,
+                        "outflow": cvd_val if cvd_val < 0 else None,
+                        # general（尽量补齐 UI 需要的字段）
+                        "quote_volume": quote_volume,
+                        "price": price,
+                        "主动买卖比": _to_float_or_none(base.get("主动买卖比")),
+                        "振幅": _to_float_or_none(base.get("振幅")),
+                        "成交笔数": _to_float_or_none(base.get("成交笔数") or base.get("交易次数")),
                     }
-                    base_map = self.provider.fetch_base_with_field(period, field_map[flow_type]) or base_map
-            for sym, r in base_map.items():
-                inflow = _to_float_or_none(r.get("主动买额") or r.get("主动买入额"))
-                outflow = _to_float_or_none(r.get("主动卖出额") or r.get("主动卖额"))
-                net_flow = _to_float_or_none(r.get("资金流向"))
-                items.append({
-                    "symbol": format_symbol(sym),
-                    "absolute": net_flow,
-                    "volume": _to_float_or_none(r.get("成交额")),
-                    "inflow": inflow,
-                    "outflow": outflow,
-                    "成交笔数": _to_float_or_none(r.get("成交笔数") or r.get("交易次数")),
-                    "price": _to_float_or_none(r.get("当前价格")),
-                    "quote_volume": _to_float_or_none(r.get("成交额")),
-                })
+                )
         except Exception:
-            pass
+            items = []
 
         if flow_type in {"absolute", "inflow", "outflow"}:
             items = [item for item in items if item.get(flow_type) is not None]
@@ -348,6 +355,12 @@ class MoneyFlowCard(RankingCard):
             val = row.get(flow_type)
             if val is None:
                 return float("-inf") if reverse else float("inf")
+            # outflow 存的是负值（展示用），排序按流出“绝对值”更符合直觉
+            if flow_type == "outflow":
+                try:
+                    return abs(float(val))
+                except Exception:
+                    return 0.0
             return val
         items.sort(key=_key, reverse=reverse)
 
