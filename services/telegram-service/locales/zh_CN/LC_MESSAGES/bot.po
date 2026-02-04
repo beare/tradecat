@@ -636,7 +636,7 @@ msgid "card.flow.title"
 msgstr "💧 资金流向数据"
 
 msgid "card.flow.hint"
-msgstr "💡 净流=流入-流出；可切换净流/成交额/流入/流出/价格等维度"
+msgstr "💡 净流来自 CVD（按周期统计）；流入=净流>0，流出=净流<0；可切换净流/成交额/流入/流出/价格等维度"
 
 # 资金费率 卡片
 msgid "card.funding.title"

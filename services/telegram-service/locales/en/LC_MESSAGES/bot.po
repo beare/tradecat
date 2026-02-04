@@ -636,7 +636,7 @@ msgid "card.flow.title"
 msgstr "💧 Fund Flow Data"
 
 msgid "card.flow.hint"
-msgstr "💡 Net flow = Inflow - Outflow; switch between net/volume/inflow/outflow/price"
+msgstr "💡 Net flow uses CVD (by interval); inflow=net>0, outflow=net<0; switch between net/volume/inflow/outflow/price"
 
 # Funding card
 msgid "card.funding.title"
