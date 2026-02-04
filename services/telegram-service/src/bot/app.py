@@ -1117,6 +1117,14 @@ class DataManager:
         return {"issues_found": [], "fixes_applied": [], "success": True}
 
 
+# ==================== 排行榜菜单分组（模块级常量） ====================
+# 注意：button_callback() 内部存在 `from main import UserRequestHandler` 的局部绑定，
+# 在该函数中直接引用同名类会触发 UnboundLocalError。
+# 这里用模块级常量避免作用域陷阱。
+DEFAULT_RANKING_GROUP = "recommend"
+ALLOWED_RANKING_GROUPS = {DEFAULT_RANKING_GROUP, "basic", "futures", "advanced"}
+
+
 class UserRequestHandler:
     """专门处理用户请求的轻量级处理器 - 只读取缓存，不进行网络请求"""
 
@@ -4036,7 +4044,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
         elif query.data == "ranking_menu":
-            current_group = user_handler.user_states.get("ranking_group", UserRequestHandler.RANKING_GROUP_RECOMMEND)
+            current_group = user_handler.user_states.get("ranking_group", DEFAULT_RANKING_GROUP)
             keyboard = user_handler.get_ranking_menu_keyboard(update)
             await query.edit_message_text(
                 _build_ranking_menu_text(current_group, update),
@@ -4046,9 +4054,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif query.data.startswith("ranking_menu_group_"):
             group = query.data.replace("ranking_menu_group_", "")
-            if group in {UserRequestHandler.RANKING_GROUP_RECOMMEND, "basic", "futures", "advanced"}:
+            if group in ALLOWED_RANKING_GROUPS:
                 user_handler.user_states["ranking_group"] = group
-            current_group = user_handler.user_states.get("ranking_group", UserRequestHandler.RANKING_GROUP_RECOMMEND)
+            current_group = user_handler.user_states.get("ranking_group", DEFAULT_RANKING_GROUP)
             keyboard = user_handler.get_ranking_menu_keyboard(update)
             await query.edit_message_text(
                 _build_ranking_menu_text(current_group, update),
@@ -5977,7 +5985,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             elif action == "ranking_menu":
                 # 数据面板入口：显示榜单列表
                 text = _build_ranking_menu_text(
-                    user_handler.user_states.get("ranking_group", UserRequestHandler.RANKING_GROUP_RECOMMEND),
+                    user_handler.user_states.get("ranking_group", DEFAULT_RANKING_GROUP),
                     update,
                 )
                 keyboard = user_handler.get_ranking_menu_keyboard(update)
