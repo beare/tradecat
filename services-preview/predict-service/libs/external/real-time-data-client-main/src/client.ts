@@ -43,6 +43,23 @@ export interface RealTimeDataClientArgs {
     autoReconnect?: boolean;
 
     /**
+     * Optional maximum number of reconnect attempts.
+     * - `undefined`: unlimited retries
+     * - `0`: do not retry
+     */
+    maxReconnectAttempts?: number;
+
+    /**
+     * Optional base delay (ms) before reconnecting. Exponential backoff is applied.
+     */
+    reconnectDelayMs?: number;
+
+    /**
+     * Optional maximum delay (ms) for exponential backoff.
+     */
+    reconnectDelayMaxMs?: number;
+
+    /**
      * Optional WebSocket options (e.g., agent for proxy support).
      */
     wsOptions?: object;
@@ -61,6 +78,21 @@ export class RealTimeDataClient {
 
     /** Determines whether the client should automatically reconnect on disconnection */
     private autoReconnect: boolean;
+
+    /** Max reconnect attempts (undefined = unlimited) */
+    private readonly maxReconnectAttempts?: number;
+
+    /** Base delay for reconnect backoff */
+    private readonly reconnectDelayMs: number;
+
+    /** Max delay for reconnect backoff */
+    private readonly reconnectDelayMaxMs: number;
+
+    /** Current reconnect attempt counter */
+    private reconnectAttempts: number;
+
+    /** Pending reconnect timer handle */
+    private reconnectTimer: ReturnType<typeof setTimeout> | null;
 
     /** Callback function executed when the connection is established */
     private readonly onConnect?: (client: RealTimeDataClient) => void;
@@ -82,13 +114,22 @@ export class RealTimeDataClient {
      * @param args Configuration options for the client.
      */
     constructor(args?: RealTimeDataClientArgs) {
-        this.host = args!.host || DEFAULT_HOST;
-        this.pingInterval = args!.pingInterval || DEFAULT_PING_INTERVAL;
-        this.autoReconnect = args!.autoReconnect || true;
-        this.onCustomMessage = args!.onMessage;
-        this.onConnect = args!.onConnect;
-        this.onStatusChange = args!.onStatusChange;
-        this.wsOptions = args!.wsOptions;
+        const config: RealTimeDataClientArgs = args ?? {};
+
+        this.host = config.host || DEFAULT_HOST;
+        this.pingInterval = config.pingInterval || DEFAULT_PING_INTERVAL;
+        this.autoReconnect = config.autoReconnect !== undefined ? config.autoReconnect : true;
+
+        this.maxReconnectAttempts = config.maxReconnectAttempts;
+        this.reconnectDelayMs = typeof config.reconnectDelayMs === "number" ? config.reconnectDelayMs : 1000;
+        this.reconnectDelayMaxMs = typeof config.reconnectDelayMaxMs === "number" ? config.reconnectDelayMaxMs : 30000;
+        this.reconnectAttempts = 0;
+        this.reconnectTimer = null;
+
+        this.onCustomMessage = config.onMessage;
+        this.onConnect = config.onConnect;
+        this.onStatusChange = config.onStatusChange;
+        this.wsOptions = config.wsOptions;
     }
 
     /**
@@ -96,6 +137,25 @@ export class RealTimeDataClient {
      */
     public connect() {
         this.notifyStatusChange(ConnectionStatus.CONNECTING);
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        if (this.ws) {
+            try {
+                this.ws.onopen = null;
+                this.ws.onmessage = null;
+                this.ws.onclose = null;
+                this.ws.onerror = null;
+            } catch (_) {
+                // ignore
+            }
+            try {
+                this.ws.close();
+            } catch (_) {
+                // ignore
+            }
+        }
         this.ws = new WebSocket(this.host, this.wsOptions);
         if (this.ws) {
             this.ws.onopen = this.onOpen;
@@ -113,6 +173,7 @@ export class RealTimeDataClient {
     private onOpen = async () => {
         this.ping();
         this.notifyStatusChange(ConnectionStatus.CONNECTED);
+        this.reconnectAttempts = 0;
         if (this.onConnect) {
             this.onConnect(this);
         }
@@ -131,9 +192,7 @@ export class RealTimeDataClient {
      */
     private onError = async (err: ErrorEvent) => {
         console.error("error", err);
-        if (this.autoReconnect) {
-            this.connect();
-        }
+        this.scheduleReconnect("error");
     };
 
     /**
@@ -144,9 +203,7 @@ export class RealTimeDataClient {
     private onClose = async (message: CloseEvent) => {
         console.error("disconnected", "code", message.code, "reason", message.reason);
         this.notifyStatusChange(ConnectionStatus.DISCONNECTED);
-        if (this.autoReconnect) {
-            this.connect();
-        }
+        this.scheduleReconnect("close");
     };
 
     /**
@@ -184,7 +241,47 @@ export class RealTimeDataClient {
      */
     public disconnect() {
         this.autoReconnect = false;
-        this.ws.close();
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        if (this.ws) {
+            try {
+                this.ws.close();
+            } catch (_) {
+                // ignore
+            }
+        }
+    }
+
+    private scheduleReconnect(reason: string) {
+        if (!this.autoReconnect) {
+            return;
+        }
+        if (this.reconnectTimer) {
+            return;
+        }
+        if (typeof this.maxReconnectAttempts === "number" && this.maxReconnectAttempts >= 0) {
+            if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                console.error("reconnect attempts exceeded", this.maxReconnectAttempts, "reason", reason);
+                return;
+            }
+        }
+
+        const baseDelay = typeof this.reconnectDelayMs === "number" ? this.reconnectDelayMs : 1000;
+        const maxDelay = typeof this.reconnectDelayMaxMs === "number" ? this.reconnectDelayMaxMs : 30000;
+        const delayMs = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts), maxDelay);
+
+        this.reconnectAttempts += 1;
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            try {
+                this.connect();
+            } catch (err) {
+                console.error("reconnect connect() failed", err);
+                this.scheduleReconnect("reconnect-failed");
+            }
+        }, delayMs);
     }
 
     /**
