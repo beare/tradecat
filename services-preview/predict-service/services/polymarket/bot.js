@@ -21,8 +21,8 @@ if (process.env.HTTP_PROXY && !process.env.GLOBAL_AGENT_HTTP_PROXY) {
 if (process.env.HTTPS_PROXY && !process.env.GLOBAL_AGENT_HTTPS_PROXY) {
     process.env.GLOBAL_AGENT_HTTPS_PROXY = process.env.HTTPS_PROXY;
 }
-const { bootstrap } = require('global-agent');
-bootstrap();
+// 用可控的连接池替代 global-agent：避免大量并发请求时把本机代理端口打爆
+require('./utils/globalProxy');
 
 // 加载配置
 const config = require('./config/settings');
