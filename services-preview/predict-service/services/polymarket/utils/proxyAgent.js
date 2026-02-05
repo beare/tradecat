@@ -6,6 +6,25 @@
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
+const DEFAULT_PROXY_URL = 'http://127.0.0.1:7890';
+
+// ==================== Agent 单例缓存（避免连接风暴） ====================
+// 关键点：
+// - 以前每次 getFetchProxyOptions()/createHttpProxyAgent() 都 new 一个 Agent
+// - 会导致并发请求下产生海量 socket（全部连到 127.0.0.1:7890），最终打爆端口/FD
+// - 这里改为“按 proxyUrl 缓存一个 Agent”，并限制 maxSockets
+let cachedProxyUrl = null;
+let cachedHttpProxyAgent = null;
+let cachedSocksProxyAgent = null;
+
+const AGENT_OPTIONS = {
+    keepAlive: true,
+    keepAliveMsecs: 10_000,
+    maxSockets: 128,
+    maxFreeSockets: 32,
+    scheduling: 'lifo'
+};
+
 /**
  * 获取代理配置
  */
@@ -16,7 +35,7 @@ function getProxyConfig() {
         || process.env.HTTP_PROXY
         || process.env.http_proxy
         || process.env.PROXY
-        || 'http://127.0.0.1:7890';
+        || DEFAULT_PROXY_URL;
 
     if (!proxy) {
         console.log('⚠️  未配置代理,可能无法访问 Telegram API');
@@ -40,15 +59,29 @@ function createHttpProxyAgent(proxyUrl) {
     }
 
     try {
+        // 命中缓存：复用同一个 Agent，避免连接数指数增长
+        if (cachedProxyUrl === proxyUrl) {
+            if (proxyUrl.startsWith('socks')) {
+                return cachedSocksProxyAgent;
+            }
+            return cachedHttpProxyAgent;
+        }
+
         // 支持 socks5://
         if (proxyUrl.startsWith('socks')) {
             console.log('✅ 使用 SOCKS 代理');
-            return new SocksProxyAgent(proxyUrl);
+            cachedProxyUrl = proxyUrl;
+            cachedSocksProxyAgent = new SocksProxyAgent(proxyUrl, AGENT_OPTIONS);
+            cachedHttpProxyAgent = null;
+            return cachedSocksProxyAgent;
         }
 
         // 支持 http:// 和 https://
         console.log('✅ 使用 HTTP 代理');
-        return new HttpsProxyAgent(proxyUrl);
+        cachedProxyUrl = proxyUrl;
+        cachedHttpProxyAgent = new HttpsProxyAgent(proxyUrl, AGENT_OPTIONS);
+        cachedSocksProxyAgent = null;
+        return cachedHttpProxyAgent;
     } catch (error) {
         console.error('❌ 创建代理 Agent 失败:', error.message);
         return null;
@@ -98,6 +131,7 @@ function getFetchProxyOptions() {
 
     return {
         agent: agent,
+        // 给上层调用方一个统一的默认超时（如 fetch/axios 支持）
         timeout: 30000
     };
 }
