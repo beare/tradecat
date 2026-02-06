@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 
 from cards.base import RankingCard
 from cards.i18n import btn as _btn, lang_context, resolve_lang
@@ -143,7 +144,19 @@ class RankingRegistry:
 
         lang = resolve_lang(update)
         with lang_context(lang):
-            return await card.handle_callback(update, context, services)
+            try:
+                return await card.handle_callback(update, context, services)
+            except BadRequest as exc:
+                msg = str(exc).lower()
+                # 用户点击当前已选项时，Telegram 会拒绝“完全相同的文本+键盘”的编辑。
+                # 吞掉该异常，避免用户看到“点了没反应”。
+                if "message is not modified" in msg:
+                    return True
+                self._logger.error("❌ 卡片回调 BadRequest: card=%s data=%s err=%s", card.card_id, query.data, exc)
+                return True
+            except Exception as exc:  # pylint: disable=broad-except
+                self._logger.error("❌ 卡片回调异常: card=%s data=%s err=%s", card.card_id, query.data, exc)
+                return True
 
     # ---------- 内部工具 ----------
     def _hydrate_field_defaults(self, card: RankingCard) -> None:

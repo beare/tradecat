@@ -7,12 +7,12 @@ import re
 from typing import Dict, List, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
 from cards.i18n import btn_auto as _btn_auto, gettext as _t, format_sort_field, resolve_lang, translate_field
 from cards.排行榜服务 import (
-    DEFAULT_PERIODS,
     MONEY_FLOW_FUTURES_PERIODS,
     MONEY_FLOW_SPOT_PERIODS,
     normalize_period,
@@ -147,7 +147,18 @@ class MoneyFlowCard(RankingCard):
     async def _edit(self, query, user_handler, ensure_valid_text) -> None:
         lang = resolve_lang(query)
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text, lang, query)
-        await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        try:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        except BadRequest as e:
+            msg = str(e).lower()
+            if "message is not modified" in msg:
+                # 用户点了当前已选项，或者周期被 normalize 后未变化：至少更新键盘选中态并吞掉异常
+                try:
+                    await query.edit_message_reply_markup(reply_markup=keyboard)
+                except Exception:
+                    pass
+                return
+            raise
 
     async def _build_payload(self, user_handler, ensure_valid_text, lang=None, query=None) -> Tuple[str, object]:
         if lang is None and query is not None:
@@ -260,7 +271,18 @@ class MoneyFlowCard(RankingCard):
             for fid, lbl in special_sort
         ])
 
-        kb.append([b(p, f"money_flow_period_{p}", active=p == period) for p in DEFAULT_PERIODS])
+        # MoneyFlow 的真实可用周期不含 1m；直接展示 allowed，避免 1m->5m 的 normalize 造成“点了没反应”
+        allowed_periods = MONEY_FLOW_SPOT_PERIODS if market == "spot" else MONEY_FLOW_FUTURES_PERIODS
+        period_rows: List[List[InlineKeyboardButton]] = []
+        row: List[InlineKeyboardButton] = []
+        for p in allowed_periods:
+            row.append(b(p, f"money_flow_period_{p}", active=p == period))
+            if len(row) >= 4:
+                period_rows.append(row)
+                row = []
+        if row:
+            period_rows.append(row)
+        kb.extend(period_rows)
 
         kb.append([
             b("降序", "money_flow_sort_desc", active=sort_order == "desc"),
@@ -300,11 +322,8 @@ class MoneyFlowCard(RankingCard):
         # 资金流向的“周期”必须真能影响数据，否则用户点击周期会感觉“没刷新”。
         # 之前从「基础数据」表直接读资金流向字段，实测多个周期数值被上游写成同一份快照，导致周期切换无差异。
         # 这里改为以「CVD信号排行榜」为主数据源（按周期分桶），让周期切换真正影响榜单排序与数值。
-        allowed = DEFAULT_PERIODS
-        if period == "1m" and "1m" in allowed:
-            period = "1m"
-        else:
-            period = normalize_period(period, allowed, default="15m")
+        allowed = MONEY_FLOW_SPOT_PERIODS if market == "spot" else MONEY_FLOW_FUTURES_PERIODS
+        period = normalize_period(period, allowed, default="15m")
         handler.user_states["money_flow_period"] = period
 
         items: List[Dict] = []
