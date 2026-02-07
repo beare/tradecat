@@ -601,6 +601,22 @@ class PGSignalEngine(BaseEngine):
         metrics = self._fetch_latest_metrics()
         rules = PGSignalRules()
 
+        candle_checkers = {
+            rules.check_price_surge,
+            rules.check_price_dump,
+            rules.check_volume_spike,
+            rules.check_taker_buy_dominance,
+            rules.check_taker_sell_dominance,
+        }
+        metric_checkers = {
+            rules.check_oi_surge,
+            rules.check_oi_dump,
+            rules.check_top_trader_extreme_long,
+            rules.check_top_trader_extreme_short,
+            rules.check_taker_ratio_flip_long,
+            rules.check_taker_ratio_flip_short,
+        }
+
         for symbol in self.symbols:
             curr_candle = candles.get(symbol)
             prev_candle = self.baseline_candles.get(symbol)
@@ -647,6 +663,22 @@ class PGSignalEngine(BaseEngine):
                 try:
                         signal = checker(*args)
                         if signal:
+                            # -------------------- 统一修复：价格/周期缺失 --------------------
+                            # PG 指标类信号（metrics_5m）本身不含 close，历史上会导致 telegram 推送显示 $0.0000。
+                            # 同时，K线类信号应标注 1m，指标类信号应标注 5m。
+                            try:
+                                close_price = _safe_float(curr_candle.get("close", 0), 0.0) if curr_candle else 0.0
+                            except Exception:
+                                close_price = 0.0
+
+                            if checker in candle_checkers:
+                                signal.timeframe = "1m"
+                            elif checker in metric_checkers:
+                                signal.timeframe = "5m"
+
+                            if (_safe_float(getattr(signal, "price", 0.0), 0.0) <= 0.0) and close_price > 0:
+                                signal.price = close_price
+
                             signal_key = f"pg:{signal.symbol}_{signal.signal_type}"
                             cooldown_seconds = self.cooldown_seconds
                             if self._is_cooled_down(signal_key, cooldown_seconds):
