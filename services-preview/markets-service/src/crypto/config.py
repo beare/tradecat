@@ -83,7 +83,7 @@ class Settings:
     # 数据库 - 优先使用 MARKETS_SERVICE_DATABASE_URL
     database_url: str = field(default_factory=lambda: os.getenv(
         "MARKETS_SERVICE_DATABASE_URL",
-        os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data")
+        os.getenv("DATABASE_URL", "")
     ))
 
     # 写入模式: "raw" = raw.*, "legacy" = market_data.*
@@ -103,12 +103,12 @@ class Settings:
     binance_fapi_base: str = field(default_factory=lambda: (
         os.getenv("MARKETS_SERVICE_BINANCE_FAPI_BASE")
         or os.getenv("BINANCE_FAPI_BASE")
-        or "https://fapi.binance.com"
+        or ""
     ).rstrip("/"))
     binance_data_base: str = field(default_factory=lambda: (
         os.getenv("MARKETS_SERVICE_BINANCE_DATA_BASE")
         or os.getenv("BINANCE_DATA_BASE")
-        or "https://data.binance.vision"
+        or ""
     ).rstrip("/"))
 
     # 目录

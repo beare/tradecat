@@ -113,6 +113,18 @@ pm2 save
 | `LOG_LEVEL` | ❌ | 日志级别：debug/info/warn/error |
 | `DEBUG` | ❌ | 调试模式：true/false |
 | `HTTPS_PROXY` | ❌ | HTTP 代理地址 |
+| `TELEGRAM_API_BASE` | ❌ | Telegram API 基础地址（默认由全局配置提供） |
+| `POLYMARKET_WS_HOST` | ❌ | Polymarket WebSocket 地址 |
+| `POLYMARKET_GAMMA_API_BASE` | ❌ | Polymarket Gamma API 地址 |
+| `POLYMARKET_DATA_API_BASE` | ❌ | Polymarket Data API 地址 |
+| `KALSHI_API_BASE` | ❌ | Kalshi REST API 地址 |
+| `KALSHI_WS_BASE` | ❌ | Kalshi WebSocket 地址 |
+| `KALSHI_WEB_BASE` | ❌ | Kalshi 页面链接前缀 |
+| `OPINION_HOST` | ❌ | Opinion API 地址 |
+| `OPINION_RPC_URL` | ❌ | Opinion 链上 RPC 地址 |
+| `NODEJS_SETUP_URL` | ❌ | 远程部署脚本使用的 Node.js 安装脚本地址 |
+| `GOOGLE_TRANSLATE_API_BASE` | ❌ | Google 翻译 HTTP API 地址（代理模式） |
+| `MYMEMORY_API_BASE` | ❌ | MyMemory 翻译 API 地址 |
 
 ### 信号模块配置（config/settings.js）
 

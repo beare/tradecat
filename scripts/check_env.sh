@@ -145,8 +145,10 @@ check_config() {
         
         # 代理配置
         local http_proxy=$(grep "^HTTP_PROXY=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        local telegram_api_base=$(grep "^TELEGRAM_API_BASE=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        [ -z "$telegram_api_base" ] && telegram_api_base="${TELEGRAM_API_BASE:-}"
         if [ -n "$http_proxy" ]; then
-            if curl -s --connect-timeout 3 -x "$http_proxy" https://api.telegram.org -o /dev/null 2>/dev/null; then
+            if [ -n "$telegram_api_base" ] && curl -s --connect-timeout 3 -x "$http_proxy" "$telegram_api_base" -o /dev/null 2>/dev/null; then
                 success "HTTP_PROXY: $http_proxy (可用)"
             else
                 warn "HTTP_PROXY: $http_proxy (连接失败)"
@@ -247,19 +249,44 @@ check_network() {
     if [ -f "$config_file" ]; then
         proxy=$(grep "^HTTP_PROXY=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
     fi
+    local telegram_api_base=""
+    local binance_ping_url=""
+    if [ -f "$config_file" ]; then
+        telegram_api_base=$(grep "^TELEGRAM_API_BASE=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        binance_ping_url=$(grep "^BINANCE_PING_URL=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        if [ -z "$binance_ping_url" ]; then
+            local binance_rest_base=$(grep "^BINANCE_REST_BASE_MAINNET=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+            local binance_fapi_base=$(grep "^BINANCE_FAPI_BASE=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+            if [ -n "$binance_rest_base" ]; then
+                binance_ping_url="${binance_rest_base%/}/api/v3/ping"
+            elif [ -n "$binance_fapi_base" ]; then
+                binance_ping_url="${binance_fapi_base%/}/fapi/v1/ping"
+            fi
+        fi
+    fi
+    [ -z "$telegram_api_base" ] && telegram_api_base="${TELEGRAM_API_BASE:-}"
+    if [ -z "$binance_ping_url" ]; then
+        if [ -n "${BINANCE_PING_URL:-}" ]; then
+            binance_ping_url="${BINANCE_PING_URL}"
+        elif [ -n "${BINANCE_REST_BASE_MAINNET:-}" ]; then
+            binance_ping_url="${BINANCE_REST_BASE_MAINNET%/}/api/v3/ping"
+        elif [ -n "${BINANCE_FAPI_BASE:-}" ]; then
+            binance_ping_url="${BINANCE_FAPI_BASE%/}/fapi/v1/ping"
+        fi
+    fi
     
     local curl_opts="-s --connect-timeout 5"
     [ -n "$proxy" ] && curl_opts="$curl_opts -x $proxy"
     
     # Telegram API
-    if eval "curl $curl_opts https://api.telegram.org -o /dev/null" 2>/dev/null; then
+    if [ -n "$telegram_api_base" ] && eval "curl $curl_opts $telegram_api_base -o /dev/null" 2>/dev/null; then
         success "Telegram API: 可达"
     else
         fail "Telegram API: 无法连接 (检查代理配置)"
     fi
     
     # Binance API
-    if eval "curl $curl_opts https://api.binance.com/api/v3/ping -o /dev/null" 2>/dev/null; then
+    if [ -n "$binance_ping_url" ] && eval "curl $curl_opts $binance_ping_url -o /dev/null" 2>/dev/null; then
         success "Binance API: 可达"
     else
         warn "Binance API: 无法连接"

@@ -214,10 +214,11 @@ pnpm example:live-arb     # 实时套利扫描
 
 ---
 
-*最后更新：2025-12-25*
+*最后更新：2026-02-10*
 
 ---
 
 ## 11. 变更日志
 
 - 2026-01-18：CSV 报告脚本合并为 `scripts/csv-report.js`，对外仅保留一套统计逻辑。
+- 2026-02-10：配置全面改为环境变量驱动，新增/统一 `TELEGRAM_API_BASE`、`POLYMARKET_*`、`KALSHI_*`、`OPINION_*`、`NODEJS_SETUP_URL` 等地址配置项。

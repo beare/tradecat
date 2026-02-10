@@ -3,17 +3,36 @@
  *
  * 包含所有模块的配置选项
  */
-
+const fs = require('fs');
 const path = require('path');
-// 统一使用 tradecat/config/.env
-const projectRoot = path.resolve(__dirname, '../../../../../');
+
+const resolveProjectRoot = () => {
+    const explicitRoot = process.env.TRADECAT_ROOT || process.env.PROJECT_ROOT;
+    if (explicitRoot) {
+        return explicitRoot;
+    }
+    let current = __dirname;
+    while (true) {
+        const dotenvCandidate = path.join(current, 'config', '.env');
+        if (fs.existsSync(dotenvCandidate)) {
+            return current;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) {
+            return process.cwd();
+        }
+        current = parent;
+    }
+};
+
+const projectRoot = resolveProjectRoot();
 const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath, override: true });
 
 module.exports = {
     // ==================== Polymarket WebSocket ====================
     polymarket: {
-        host: process.env.POLYMARKET_WS_HOST || 'wss://ws-live-data.polymarket.com',
+        host: process.env.POLYMARKET_WS_HOST || '',
         pingInterval: 5000,
         autoReconnect: true,
         maxReconnectAttempts: Number(process.env.POLYMARKET_WS_MAX_RECONNECT_ATTEMPTS || 0), // 0 = 无限重试
@@ -82,7 +101,7 @@ module.exports = {
         maxMarkets: Number(process.env.CLOSING_MAX_MARKETS || 9999),
         pageSize: Number(process.env.CLOSING_PAGE_SIZE || 10),
         refreshIntervalMs: Number(process.env.CLOSING_REFRESH_INTERVAL_MS || 300000), // 5分钟
-        gammaApi: process.env.CLOSING_GAMMA_API || 'https://gamma-api.polymarket.com',
+        gammaApi: process.env.CLOSING_GAMMA_API || process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || '',
         fetchTimeoutMs: Number(process.env.CLOSING_FETCH_TIMEOUT_MS || 15000),
         emitEmpty: process.env.CLOSING_EMIT_EMPTY === 'true',
         messageVariant: process.env.CLOSING_MESSAGE_VARIANT || 'list',
@@ -106,7 +125,7 @@ module.exports = {
     newMarket: {
         enabled: true,                  // 是否启用
         scanIntervalMs: Number(process.env.NEW_MARKET_SCAN_INTERVAL || 60000),  // 扫描间隔 1分钟
-        gammaApi: process.env.NEW_MARKET_GAMMA_API || 'https://gamma-api.polymarket.com',
+        gammaApi: process.env.NEW_MARKET_GAMMA_API || process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || '',
         limit: Number(process.env.NEW_MARKET_LIMIT || 500),  // 每次获取市场数
         // 无阈值档位，只有开关
     },
@@ -117,7 +136,7 @@ module.exports = {
         trackTopN: Number(process.env.SMART_MONEY_TRACK_TOP_N || 100),  // 跟踪 Top 100
         scanIntervalMs: Number(process.env.SMART_MONEY_SCAN_INTERVAL || 120000),  // 扫描间隔 2分钟
         minPositionValue: Number(process.env.SMART_MONEY_MIN_POSITION || 500),  // 最低持仓 $500
-        dataApi: process.env.SMART_MONEY_DATA_API || 'https://data-api.polymarket.com',
+        dataApi: process.env.SMART_MONEY_DATA_API || process.env.POLYMARKET_DATA_API_BASE || process.env.DATA_API_BASE || '',
         // 阈值档位对应的最低持仓变化金额
         thresholds: {
             1: 100,     // 宽松 $100

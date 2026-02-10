@@ -24,15 +24,22 @@ from storage.history import SignalHistory, get_history
 logger = logging.getLogger(__name__)
 
 
+def _get_binance_web_base() -> str:
+    return (os.getenv("BINANCE_WEB_BASE") or "").strip().rstrip("/")
+
+
 def build_binance_url(symbol: str, market: str = "futures") -> str:
     """构造 Binance 跳转链接。默认永续，回退加 USDT。"""
+    web_base = _get_binance_web_base()
     sym = symbol.upper().replace("/", "")
     if not sym.endswith("USDT"):
         sym = f"{sym}USDT"
     if market == "spot":
         base = sym.replace("USDT", "_USDT", 1)
-        return f"https://www.binance.com/en/trade/{base}?type=spot"
-    return f"https://www.binance.com/en/futures/{sym}?type=perpetual"
+        path = f"/en/trade/{base}?type=spot"
+    else:
+        path = f"/en/futures/{sym}?type=perpetual"
+    return f"{web_base}{path}" if web_base else path
 
 # 数据库路径
 _SIGNALS_DIR = os.path.dirname(os.path.abspath(__file__))

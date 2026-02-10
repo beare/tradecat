@@ -53,7 +53,13 @@ def _fetch_all_symbols_ccxt() -> List[str]:
 
 def _fetch_all_symbols_rest() -> List[str]:
     """使用 Binance REST 获取 USDT 永续符号。"""
-    url = os.getenv("SYMBOLS_ALL_URL", "https://fapi.binance.com/fapi/v1/exchangeInfo")
+    url = os.getenv("SYMBOLS_ALL_URL")
+    if not url:
+        base = (os.getenv("BINANCE_FAPI_BASE") or os.getenv("BINANCE_REST_BASE_MAINNET") or "").rstrip("/")
+        if base:
+            url = f"{base}/fapi/v1/exchangeInfo"
+    if not url:
+        raise RuntimeError("未配置 SYMBOLS_ALL_URL 或 BINANCE_FAPI_BASE/BINANCE_REST_BASE_MAINNET")
     handler = _proxy_handler()
     opener = urllib.request.build_opener(handler) if handler else urllib.request.build_opener()
     retries = int(os.getenv("SYMBOLS_ALL_RETRIES", "3"))

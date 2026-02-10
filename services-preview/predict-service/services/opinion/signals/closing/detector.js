@@ -7,7 +7,7 @@
 const DEFAULT_GAMMA_API = process.env.GAMMA_API_BASE
     || process.env.POLYMARKET_GAMMA_API_BASE
     || process.env.NEW_MARKET_GAMMA_API
-    || 'https://gamma-api.polymarket.com';
+    || '';
 
 class ClosingMarketScanner {
     constructor(config = {}) {

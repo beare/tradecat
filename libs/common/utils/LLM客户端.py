@@ -39,8 +39,12 @@ class LLM客户端:
         env_path = 获取仓库根目录() / "config" / ".env"
         load_dotenv(env_path)
 
-        # 设置API地址
-        self.base_url = base_url or os.getenv("LLM_API_BASE_URL", "http://localhost:8000")
+        # 设置 API 地址（必须来自入参或环境变量）
+        self.base_url = (base_url or os.getenv("LLM_API_BASE_URL", "")).rstrip("/")
+        if not self.base_url:
+            raise ValueError(
+                f"未找到 LLM_API_BASE_URL 配置，请在 {env_path} 中设置或在初始化时传入 base_url"
+            )
         self.api_key = api_key or os.getenv("EXTERNAL_API_KEY")
 
         if not self.api_key:

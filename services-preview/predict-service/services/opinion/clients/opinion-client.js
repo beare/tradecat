@@ -10,7 +10,7 @@ const EventEmitter = require('events');
 class OpinionClient extends EventEmitter {
     constructor(options = {}) {
         super();
-        this.host = options.host || process.env.OPINION_HOST || 'https://proxy.opinion.trade:8443';
+        this.host = options.host || process.env.OPINION_HOST || '';
         this.apiKey = options.apiKey || process.env.OPINION_API_KEY || '';
         this.chainId = options.chainId || Number(process.env.OPINION_CHAIN_ID) || 56;
         

@@ -12,10 +12,10 @@ const REQUEST_MAX_RETRIES = 2;
 const REQUEST_RETRY_BACKOFF_MS = 300;
 const CACHE_TTL_MS = 30 * 60 * 1000;  // 30分钟
 const CACHE_MAX_SIZE = 200000;         // 20万条
-const CLOB_API_BASE = (process.env.POLYMARKET_CLOB_API_BASE || process.env.CLOB_API_BASE || 'https://clob.polymarket.com').replace(/\/$/, '');
-const GAMMA_API_BASE = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || 'https://gamma-api.polymarket.com')
+const CLOB_API_BASE = (process.env.POLYMARKET_CLOB_API_BASE || process.env.CLOB_API_BASE || '').replace(/\/$/, '');
+const GAMMA_API_BASE = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || process.env.NEW_MARKET_GAMMA_API || '')
     .replace(/\/$/, '');
-const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || 'https://polymarket.com').replace(/\/$/, '');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 
 class MarketDataFetcher {
     constructor() {

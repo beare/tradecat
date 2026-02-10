@@ -52,6 +52,13 @@ safe_load_env() {
 # 加载全局配置 → 服务配置（后者覆盖）
 safe_load_env "$PROJECT_ROOT/config/.env"
 # 配置已统一到 config/.env
+if [ -z "${BINANCE_PING_URL:-}" ]; then
+    if [ -n "${BINANCE_REST_BASE_MAINNET:-}" ]; then
+        BINANCE_PING_URL="${BINANCE_REST_BASE_MAINNET%/}/api/v3/ping"
+    elif [ -n "${BINANCE_FAPI_BASE:-}" ]; then
+        BINANCE_PING_URL="${BINANCE_FAPI_BASE%/}/fapi/v1/ping"
+    fi
+fi
 
 # 校验 SYMBOLS_* 格式
 validate_symbols() {
@@ -79,9 +86,11 @@ check_proxy() {
     local retries=3
     local delay=1
     local i=0
+    local ping_url="${BINANCE_PING_URL:-}"
+    [ -z "$ping_url" ] && return 0
     
     while [ $i -lt $retries ]; do
-        if curl -s --max-time 3 --proxy "$proxy" https://api.binance.com/api/v3/ping >/dev/null 2>&1; then
+        if curl -s --max-time 3 --proxy "$proxy" "$ping_url" >/dev/null 2>&1; then
             echo "✓ 代理可用: $proxy"
             return 0
         fi

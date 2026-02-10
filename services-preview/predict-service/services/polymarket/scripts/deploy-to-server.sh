@@ -9,6 +9,8 @@ SERVER_USER="${SERVER_USER:-root}"
 SERVER_PASSWORD="${SERVER_PASSWORD:?set SERVER_PASSWORD}"
 REMOTE_PATH="${REMOTE_PATH:-~/.projects/polymarket}"
 LOCAL_PATH="${LOCAL_PATH:-$DEFAULT_LOCAL_PATH}"
+TMP_DIR="${TMP_DIR:-${TMPDIR:-/tmp}}"
+NODEJS_SETUP_URL="${NODEJS_SETUP_URL:?set NODEJS_SETUP_URL}"
 
 echo "==================================="
 echo "Polymarket Bot Deployment Script"
@@ -38,7 +40,8 @@ echo "Preparing files for transfer..."
 cd "$LOCAL_PATH"
 
 # Create a temporary list of files to exclude
-cat > /tmp/rsync-exclude.txt <<EOF
+RSYNC_EXCLUDE_FILE="$(mktemp "${TMP_DIR%/}/rsync-exclude.XXXXXX.txt")"
+cat > "$RSYNC_EXCLUDE_FILE" <<EOF
 .git
 node_modules
 bot/node_modules
@@ -58,19 +61,20 @@ EOF
 # Transfer files to server
 echo "Transferring files to server..."
 sshpass -p "$SERVER_PASSWORD" rsync -avz --progress \
-    --exclude-from=/tmp/rsync-exclude.txt \
+    --exclude-from="$RSYNC_EXCLUDE_FILE" \
     "$LOCAL_PATH/" \
     "$SERVER_USER@$SERVER_IP:$REMOTE_PATH/"
 
 # Install dependencies and setup
 echo "Installing dependencies on server..."
-sshpass -p "$SERVER_PASSWORD" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "REMOTE_PATH='$REMOTE_PATH' bash" << 'REMOTE_SCRIPT'
+sshpass -p "$SERVER_PASSWORD" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "REMOTE_PATH='$REMOTE_PATH' NODEJS_SETUP_URL='$NODEJS_SETUP_URL' bash" << 'REMOTE_SCRIPT'
 cd "$REMOTE_PATH"
+NODEJS_SETUP_URL="${NODEJS_SETUP_URL:?set NODEJS_SETUP_URL}"
 
 echo "Checking Node.js installation..."
 if ! command -v node &> /dev/null; then
     echo "Installing Node.js..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    curl -fsSL "$NODEJS_SETUP_URL" | bash -
     apt-get install -y nodejs
 fi
 
@@ -109,7 +113,7 @@ echo ""
 REMOTE_SCRIPT
 
 # Cleanup
-rm -f /tmp/rsync-exclude.txt
+rm -f "$RSYNC_EXCLUDE_FILE"
 
 echo ""
 echo "Deployment process completed!"

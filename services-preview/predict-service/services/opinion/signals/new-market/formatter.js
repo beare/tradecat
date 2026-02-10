@@ -3,11 +3,12 @@
  */
 
 const { t } = require('../../i18n');
+const OPINION_WEB_BASE = (process.env.OPINION_WEB_BASE || '').replace(/\/$/, '');
 
 function buildMarketUrl(signal) {
     // Opinion 市场链接
-    if (signal.marketId) {
-        return `https://opinion.trade/market/${signal.marketId}`;
+    if (signal.marketId && OPINION_WEB_BASE) {
+        return `${OPINION_WEB_BASE}/market/${signal.marketId}`;
     }
     return null;
 }

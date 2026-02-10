@@ -7,8 +7,27 @@
  */
 
 // 全局代理注入 - 必须在最开头
+const fs = require('fs');
 const path = require('path');
-const projectRoot = path.resolve(__dirname, '../../../../../');
+const resolveProjectRoot = () => {
+    const explicitRoot = process.env.TRADECAT_ROOT || process.env.PROJECT_ROOT;
+    if (explicitRoot) {
+        return explicitRoot;
+    }
+    let current = __dirname;
+    while (true) {
+        const dotenvCandidate = path.join(current, 'config', '.env');
+        if (fs.existsSync(dotenvCandidate)) {
+            return current;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) {
+            return process.cwd();
+        }
+        current = parent;
+    }
+};
+const projectRoot = resolveProjectRoot();
 const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath, override: true });
 const { bootstrap } = require('global-agent');
@@ -66,9 +85,9 @@ const stats = {
 
 // 市场元数据缓存
 const marketCache = new Map();
-const CLOB_API_BASE = process.env.CLOB_API_BASE || 'https://clob.polymarket.com';
-const GAMMA_API_BASE = process.env.GAMMA_API_BASE || 'https://gamma-api.polymarket.com';
-const DATA_API_BASE = process.env.DATA_API_BASE || 'https://data-api.polymarket.com';
+const CLOB_API_BASE = process.env.CLOB_API_BASE || process.env.POLYMARKET_CLOB_API_BASE || '';
+const GAMMA_API_BASE = process.env.GAMMA_API_BASE || process.env.POLYMARKET_GAMMA_API_BASE || process.env.NEW_MARKET_GAMMA_API || '';
+const DATA_API_BASE = process.env.DATA_API_BASE || process.env.POLYMARKET_DATA_API_BASE || process.env.SMART_MONEY_DATA_API || '';
 
 // 初始化检测器 (降低阈值以便测试)
 const detectors = {

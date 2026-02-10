@@ -5,6 +5,7 @@
 
 const https = require('https');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const GOOGLE_TRANSLATE_API_BASE = (process.env.GOOGLE_TRANSLATE_API_BASE || '').replace(/\/$/, '');
 
 class GoogleTranslateProxy {
   constructor(proxyUrl = null) {
@@ -16,8 +17,11 @@ class GoogleTranslateProxy {
 
   async translate(text, from = 'en', to = 'zh-CN') {
     if (!text || text.length < 2) return text;
+    if (!GOOGLE_TRANSLATE_API_BASE) {
+      throw new Error('未配置 GOOGLE_TRANSLATE_API_BASE');
+    }
 
-    const url = `https://translate.google.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `${GOOGLE_TRANSLATE_API_BASE}?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
 
     return new Promise((resolve, reject) => {
       const options = {

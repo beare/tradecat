@@ -3,10 +3,29 @@
  * 
  * 包含所有模块的配置选项
  */
-
+const fs = require('fs');
 const path = require('path');
-// 统一使用 tradecat/config/.env
-const projectRoot = path.resolve(__dirname, '../../../../../../');
+
+const resolveProjectRoot = () => {
+  const explicitRoot = process.env.TRADECAT_ROOT || process.env.PROJECT_ROOT;
+  if (explicitRoot) {
+    return explicitRoot;
+  }
+  let current = __dirname;
+  while (true) {
+    const dotenvCandidate = path.join(current, 'config', '.env');
+    if (fs.existsSync(dotenvCandidate)) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return process.cwd();
+    }
+    current = parent;
+  }
+};
+
+const projectRoot = resolveProjectRoot();
 const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath });
 
@@ -14,10 +33,10 @@ module.exports = {
   // ==================== Kalshi API ====================
   kalshi: {
     // REST API
-    baseUrl: process.env.KALSHI_API_URL || 'https://api.elections.kalshi.com/trade-api/v2',
+    baseUrl: process.env.KALSHI_API_URL || process.env.KALSHI_API_BASE || '',
     
     // WebSocket
-    wsUrl: process.env.KALSHI_WS_URL || 'wss://api.elections.kalshi.com',
+    wsUrl: process.env.KALSHI_WS_URL || process.env.KALSHI_WS_BASE || '',
     
     // 认证
     apiKeyId: process.env.KALSHI_API_KEY_ID || '',

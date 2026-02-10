@@ -54,26 +54,26 @@ class Settings:
 
     database_url: str = field(default_factory=lambda: _env(
         "DATACAT_DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5433/market_data",
+        "",
         "DATABASE_URL",
     ))
     http_proxy: Optional[str] = field(default_factory=lambda: _env(
         "DATACAT_HTTP_PROXY", None, "HTTP_PROXY"
     ) or _env("DATACAT_HTTPS_PROXY", None, "HTTPS_PROXY"))
     binance_fapi_base: str = field(default_factory=lambda: (
-        _env("DATACAT_BINANCE_FAPI_BASE", "https://fapi.binance.com", "BINANCE_FAPI_BASE") or "https://fapi.binance.com"
+        _env("DATACAT_BINANCE_FAPI_BASE", "", "BINANCE_FAPI_BASE") or ""
     ).rstrip("/"))
     binance_data_base: str = field(default_factory=lambda: (
-        _env("DATACAT_BINANCE_DATA_BASE", "https://data.binance.vision", "BINANCE_DATA_BASE")
-        or "https://data.binance.vision"
+        _env("DATACAT_BINANCE_DATA_BASE", "", "BINANCE_DATA_BASE")
+        or ""
     ).rstrip("/"))
     binance_alpha_url: str = field(default_factory=lambda: (
         _env(
             "DATACAT_BINANCE_ALPHA_URL",
-            "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list",
+            "",
             "BINANCE_ALPHA_URL",
         )
-        or "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list"
+        or ""
     ))
 
     log_dir: Path = field(default_factory=lambda: Path(_env(

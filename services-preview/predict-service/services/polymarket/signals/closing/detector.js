@@ -3,7 +3,7 @@ const { getFetchProxyOptions } = require('../../utils/proxyAgent');
 const DEFAULT_GAMMA_API = process.env.POLYMARKET_GAMMA_API_BASE
     || process.env.NEW_MARKET_GAMMA_API
     || process.env.GAMMA_API_BASE
-    || 'https://gamma-api.polymarket.com';
+    || '';
 
 /**
  * 扫尾盘检测器 (SDK 版本)

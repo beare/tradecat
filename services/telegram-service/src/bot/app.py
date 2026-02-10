@@ -696,15 +696,22 @@ def check_click_rate_limit(user_id: int, button_data: str = "", is_ai_feature: b
     return True, 0.0
 
 # ==================== 单币快照辅助 ====================
+def _get_binance_web_base() -> str:
+    return (os.getenv("BINANCE_WEB_BASE") or "").strip().rstrip("/")
+
+
 def _build_binance_url(symbol: str, market: str = "futures") -> str:
     """构造 Binance 跳转链接，默认永续合约。"""
+    web_base = _get_binance_web_base()
     sym = (symbol or "").upper().replace("/", "")
     if not sym.endswith("USDT"):
         sym = f"{sym}USDT"
     if market == "spot":
         base = sym.replace("USDT", "_USDT", 1)
-        return f"https://www.binance.com/en/trade/{base}?type=spot"
-    return f"https://www.binance.com/en/futures/{sym}?type=perpetual"
+        path = f"/en/trade/{base}?type=spot"
+    else:
+        path = f"/en/futures/{sym}?type=perpetual"
+    return f"{web_base}{path}" if web_base else path
 
 
 def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_cards: dict, page: int = 0, pages: int = 1, update=None, lang: str = None, symbol: str | None = None):

@@ -2,6 +2,13 @@
  * 套利信号格式化
  */
 
+const KALSHI_WEB_BASE = (process.env.KALSHI_WEB_BASE || '').replace(/\/$/, '');
+
+function buildMarketUrl(ticker) {
+  const marketPath = `/markets/${ticker}`;
+  return KALSHI_WEB_BASE ? `${KALSHI_WEB_BASE}${marketPath}` : marketPath;
+}
+
 function format(signal, market, translate = s => s) {
   const title = translate(market?.title || signal.ticker);
   const { subType, netProfit, grossProfit } = signal;
@@ -25,7 +32,7 @@ function format(signal, market, translate = s => s) {
 
 ⚠️ 无论结果如何，保证获利
 
-🔗 [查看市场](https://kalshi.com/markets/${signal.ticker})`;
+🔗 [查看市场](${buildMarketUrl(signal.ticker)})`;
   } else {
     // 卖出套利
     return `💰 *套利机会 (卖出)*
@@ -42,7 +49,7 @@ function format(signal, market, translate = s => s) {
 
 ⚠️ 需要持有双边仓位
 
-🔗 [查看市场](https://kalshi.com/markets/${signal.ticker})`;
+🔗 [查看市场](${buildMarketUrl(signal.ticker)})`;
   }
 }
 

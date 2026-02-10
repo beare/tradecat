@@ -1,9 +1,10 @@
 """配置管理"""
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 # 加载全局 config/.env
 _SERVICE_ROOT = Path(__file__).resolve().parents[4]  # src/core/config.py -> core -> src -> market-maker -> src -> order-service
@@ -17,6 +18,21 @@ if _env_file.exists():
             os.environ.setdefault(k.strip(), v.strip())
 
 
+_ENV_REF_PATTERN = re.compile(r"^\$\{([A-Z0-9_]+)\}$")
+
+
+def _resolve_env_refs(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _resolve_env_refs(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve_env_refs(v) for v in value]
+    if isinstance(value, str):
+        match = _ENV_REF_PATTERN.fullmatch(value.strip())
+        if match:
+            return os.getenv(match.group(1), "")
+    return value
+
+
 @dataclass
 class ExchangeConfig:
     name: str = "binanceusdm"
@@ -24,10 +40,10 @@ class ExchangeConfig:
     api_secret: str = ""
     testnet: bool = True
     proxy: str = ""  # 从环境变量 HTTP_PROXY 读取
-    rest_base_mainnet: str = "https://fapi.binance.com"
-    rest_base_testnet: str = "https://testnet.binancefuture.com"
-    ws_base_mainnet: str = "wss://fstream.binance.com"
-    ws_base_testnet: str = "wss://stream.binancefuture.com"
+    rest_base_mainnet: str = ""
+    rest_base_testnet: str = ""
+    ws_base_mainnet: str = ""
+    ws_base_testnet: str = ""
     hedge_mode: bool = False  # 是否启用双向持仓模式（不再通过 REST 探测）
     strict_no_rest_markets: bool = False  # 是否预置 markets 以避免 load_markets 隐式 REST
     markets_path: str = "config/markets.json"  # 预置合约元数据路径
@@ -80,7 +96,7 @@ class Config:
     @classmethod
     def from_file(cls, path: str) -> "Config":
         with open(path) as f:
-            data = json.load(f)
+            data = _resolve_env_refs(json.load(f))
         return cls(
             exchange=ExchangeConfig(**data.get("exchange", {})),
             strategy=StrategyConfig(**data.get("strategy", {})),
@@ -95,9 +111,9 @@ class Config:
                 api_secret=os.getenv("API_SECRET", ""),
                 testnet=os.getenv("TESTNET", "true").lower() == "true",
                 proxy=os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY") or "",
-                rest_base_mainnet=os.getenv("BINANCE_REST_BASE_MAINNET", "https://fapi.binance.com"),
-                rest_base_testnet=os.getenv("BINANCE_REST_BASE_TESTNET", "https://testnet.binancefuture.com"),
-                ws_base_mainnet=os.getenv("BINANCE_WS_BASE_MAINNET", "wss://fstream.binance.com"),
-                ws_base_testnet=os.getenv("BINANCE_WS_BASE_TESTNET", "wss://stream.binancefuture.com"),
+                rest_base_mainnet=os.getenv("BINANCE_REST_BASE_MAINNET", ""),
+                rest_base_testnet=os.getenv("BINANCE_REST_BASE_TESTNET", ""),
+                ws_base_mainnet=os.getenv("BINANCE_WS_BASE_MAINNET", ""),
+                ws_base_testnet=os.getenv("BINANCE_WS_BASE_TESTNET", ""),
             )
         )

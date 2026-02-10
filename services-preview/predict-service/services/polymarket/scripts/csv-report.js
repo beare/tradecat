@@ -12,12 +12,32 @@ const { SocksProxyAgent } = require('socks-proxy-agent');
 const fetch = require('node-fetch');
 const GoogleTranslateProxy = require('../translation/google-proxy');
 
-const projectRoot = path.resolve(__dirname, '../../../../../');
+const resolveProjectRoot = () => {
+  const explicitRoot = process.env.TRADECAT_ROOT || process.env.PROJECT_ROOT;
+  if (explicitRoot) {
+    return explicitRoot;
+  }
+  let current = __dirname;
+  while (true) {
+    const dotenvCandidate = path.join(current, 'config', '.env');
+    if (fs.existsSync(dotenvCandidate)) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return process.cwd();
+    }
+    current = parent;
+  }
+};
+
+const projectRoot = resolveProjectRoot();
 const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath, override: true });
 
-const GAMMA_API = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || 'https://gamma-api.polymarket.com')
+const GAMMA_API = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || process.env.NEW_MARKET_GAMMA_API || '')
   .replace(/\/$/, '');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 const TRANSLATE_ENABLED = process.env.CSV_TRANSLATE !== 'false';
 const TRANSLATE_MAX = Number(process.env.CSV_TRANSLATE_MAX || 120);
 const TRANSLATE_CACHE_FILE = process.env.CSV_TRANSLATE_CACHE_FILE || path.join(__dirname, '../data/translation-cache.json');
@@ -536,7 +556,7 @@ async function main() {
   const sortTop = (m, n = 15) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
   const link = n => {
     const s = findSlug(n);
-    return s ? `https://polymarket.com/event/${s}` : '';
+    return s && POLYMARKET_WEB_BASE ? `${POLYMARKET_WEB_BASE}/event/${s}` : '';
   };
   
   const arbTop = sortTop(data.arbCounts);
@@ -708,7 +728,7 @@ async function main() {
       if (m.question && slug) {
         rememberSlug(m.question, slug);
       }
-      return slug ? `https://polymarket.com/event/${slug}` : '';
+      return slug && POLYMARKET_WEB_BASE ? `${POLYMARKET_WEB_BASE}/event/${slug}` : '';
     };
 
     // 18. 24h成交量 Top 15

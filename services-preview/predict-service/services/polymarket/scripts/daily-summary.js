@@ -10,7 +10,7 @@ const readline = require('readline');
 const { getFetchProxyOptions } = require('../utils/proxyAgent');
 
 const LOG_PATH = process.env.LOG_PATH || path.join(__dirname, '../logs/pm2-out.log');
-const GAMMA_API = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || 'https://gamma-api.polymarket.com')
+const GAMMA_API = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || process.env.NEW_MARKET_GAMMA_API || '')
     .replace(/\/$/, '');
 
 // 信号模式

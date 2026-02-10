@@ -2,6 +2,13 @@
  * 扫尾盘信号格式化
  */
 
+const KALSHI_WEB_BASE = (process.env.KALSHI_WEB_BASE || '').replace(/\/$/, '');
+
+function buildMarketUrl(ticker) {
+  const marketPath = `/markets/${ticker}`;
+  return KALSHI_WEB_BASE ? `${KALSHI_WEB_BASE}${marketPath}` : marketPath;
+}
+
 function format(signal, translate = s => s) {
   const { market, yesPrice, noPrice, hoursLeft, confidence } = signal;
   const title = translate(market.title);
@@ -37,7 +44,7 @@ function format(signal, translate = s => s) {
 
 💰 YES: $${yesPrice.toFixed(2)} | NO: $${noPrice.toFixed(2)}
 
-🔗 [查看市场](https://kalshi.com/markets/${market.ticker})`;
+🔗 [查看市场](${buildMarketUrl(market.ticker)})`;
 }
 
 // 批量格式化（列表视图）

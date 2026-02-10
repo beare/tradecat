@@ -4,6 +4,7 @@ import os
 import sys
 import subprocess
 import time
+import tempfile
 from pathlib import Path
 
 # Configuration (env only to避免明文泄露)
@@ -13,9 +14,12 @@ SERVER_PASSWORD = os.environ.get("SERVER_PASSWORD")
 REMOTE_PATH = os.environ.get("REMOTE_PATH", "~/.projects/polymarket")
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOCAL_PATH = os.environ.get("LOCAL_PATH", str(SCRIPT_DIR.parent))
+TMP_DIR = os.environ.get("TMP_DIR") or tempfile.gettempdir()
+REMOTE_TMP_DIR = os.environ.get("REMOTE_TMP_DIR", "~")
+NODEJS_SETUP_URL = os.environ.get("NODEJS_SETUP_URL")
 
-if not SERVER_IP or not SERVER_PASSWORD:
-    print("Missing SERVER_IP or SERVER_PASSWORD env vars.")
+if not SERVER_IP or not SERVER_PASSWORD or not NODEJS_SETUP_URL:
+    print("Missing required env vars: SERVER_IP, SERVER_PASSWORD, NODEJS_SETUP_URL.")
     sys.exit(1)
 
 def run_command(cmd, check=True):
@@ -60,7 +64,7 @@ def create_archive():
     ]
 
     archive_name = f"polymarket-bot-{int(time.time())}.tar.gz"
-    archive_path = f"/tmp/{archive_name}"
+    archive_path = str(Path(TMP_DIR) / archive_name)
 
     print(f"Creating archive: {archive_path}")
 
@@ -95,7 +99,7 @@ def deploy_with_sshpass(archive_path, archive_name):
 
     # Transfer archive
     print("\n=== Transferring archive ===")
-    cmd = f'{sshpass_prefix} scp {ssh_opts} {archive_path} {server}:/tmp/'
+    cmd = f'{sshpass_prefix} scp {ssh_opts} {archive_path} {server}:{REMOTE_TMP_DIR}/'
     success, stdout, stderr = run_command(cmd)
     if not success:
         print(f"Transfer failed: {stderr}")
@@ -112,12 +116,12 @@ mkdir -p {REMOTE_PATH}
 cd {REMOTE_PATH}
 
 echo "Extracting archive..."
-tar -xzf /tmp/{archive_name}
+tar -xzf {REMOTE_TMP_DIR}/{archive_name}
 
 echo "Checking Node.js..."
 if ! command -v node &> /dev/null; then
     echo "Installing Node.js 18.x..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    curl -fsSL {NODEJS_SETUP_URL} | bash -
     apt-get install -y nodejs
 fi
 
@@ -142,7 +146,7 @@ if [ ! -f .env ]; then
     fi
 fi
 
-rm -f /tmp/{archive_name}
+rm -f {REMOTE_TMP_DIR}/{archive_name}
 
 echo ""
 echo "==================================="
@@ -174,10 +178,10 @@ def main():
         print("sshpass is not installed")
         if not install_sshpass():
             print("\nAlternative: Use manual deployment")
-            print("1. Create archive: tar -czf /tmp/polymarket.tar.gz .")
-            print(f"2. Transfer: scp /tmp/polymarket.tar.gz {SERVER_USER}@{SERVER_IP}:/tmp/")
+            print(f"1. Create archive: tar -czf {TMP_DIR}/polymarket.tar.gz .")
+            print(f"2. Transfer: scp {TMP_DIR}/polymarket.tar.gz {SERVER_USER}@{SERVER_IP}:{REMOTE_TMP_DIR}/")
             print(f"3. SSH: ssh {SERVER_USER}@{SERVER_IP}")
-            print(f"4. Extract: mkdir -p {REMOTE_PATH} && cd {REMOTE_PATH} && tar -xzf /tmp/polymarket.tar.gz")
+            print(f"4. Extract: mkdir -p {REMOTE_PATH} && cd {REMOTE_PATH} && tar -xzf {REMOTE_TMP_DIR}/polymarket.tar.gz")
             return 1
 
     # Create archive

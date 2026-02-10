@@ -10,6 +10,9 @@ SERVER_IP="${SERVER_IP:?set SERVER_IP}"
 SERVER_USER="${SERVER_USER:-root}"
 REMOTE_PATH="${REMOTE_PATH:-~/.projects/polymarket}"
 LOCAL_PATH="${LOCAL_PATH:-$DEFAULT_LOCAL_PATH}"
+TMP_DIR="${TMP_DIR:-${TMPDIR:-/tmp}}"
+REMOTE_TMP_DIR="${REMOTE_TMP_DIR:-${TMP_DIR}}"
+NODEJS_SETUP_URL="${NODEJS_SETUP_URL:?set NODEJS_SETUP_URL}"
 
 echo "==================================="
 echo "Polymarket Bot Manual Deployment"
@@ -52,11 +55,11 @@ rsync -a \
 ARCHIVE_NAME="polymarket-bot-deploy-$(date +%Y%m%d-%H%M%S).tar.gz"
 echo "Creating archive: $ARCHIVE_NAME"
 cd "$TEMP_DIR"
-tar -czf "/tmp/$ARCHIVE_NAME" .
+tar -czf "$TMP_DIR/$ARCHIVE_NAME" .
 
 echo ""
-echo "Archive created: /tmp/$ARCHIVE_NAME"
-echo "Size: $(du -h /tmp/$ARCHIVE_NAME | cut -f1)"
+echo "Archive created: $TMP_DIR/$ARCHIVE_NAME"
+echo "Size: $(du -h "$TMP_DIR/$ARCHIVE_NAME" | cut -f1)"
 echo ""
 
 # Cleanup temp directory
@@ -66,7 +69,7 @@ echo "Step 2: Transferring archive to server..."
 echo "You will be prompted for the server password (or use SSH key)"
 echo ""
 
-scp "/tmp/$ARCHIVE_NAME" "$SERVER:/tmp/" || {
+scp "$TMP_DIR/$ARCHIVE_NAME" "$SERVER:$REMOTE_TMP_DIR/" || {
     echo "Failed to transfer archive"
     exit 1
 }
@@ -83,12 +86,12 @@ mkdir -p $REMOTE_PATH
 cd $REMOTE_PATH
 
 echo "Extracting archive..."
-tar -xzf /tmp/$ARCHIVE_NAME
+tar -xzf $REMOTE_TMP_DIR/$ARCHIVE_NAME
 
 echo "Checking Node.js installation..."
 if ! command -v node &> /dev/null; then
     echo "Installing Node.js 18.x..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    curl -fsSL "$NODEJS_SETUP_URL" | bash -
     apt-get install -y nodejs
 fi
 
@@ -114,7 +117,7 @@ if [ ! -f .env ]; then
 fi
 
 # Cleanup
-rm -f /tmp/$ARCHIVE_NAME
+rm -f $REMOTE_TMP_DIR/$ARCHIVE_NAME
 
 echo ""
 echo "==================================="

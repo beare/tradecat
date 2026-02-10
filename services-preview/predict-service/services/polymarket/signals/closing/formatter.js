@@ -38,6 +38,7 @@
  */
 
 const { t } = require('../../i18n');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 
 const DISPLAY_COUNT_DEFAULT = 5;
 
@@ -122,21 +123,24 @@ function truncate(text, length) {
 }
 
 function buildMarketUrl(market) {
+    if (!POLYMARKET_WEB_BASE) {
+        return null;
+    }
     const eventSlug = market.eventSlug || null;
     const marketSlug = market.marketSlug || null;
 
     if (eventSlug) {
         if (marketSlug && marketSlug !== eventSlug) {
-            return `https://polymarket.com/event/${eventSlug}?market=${marketSlug}`;
+            return `${POLYMARKET_WEB_BASE}/event/${eventSlug}?market=${marketSlug}`;
         }
-        return `https://polymarket.com/event/${eventSlug}`;
+        return `${POLYMARKET_WEB_BASE}/event/${eventSlug}`;
     }
 
     if (marketSlug) {
-        return `https://polymarket.com/event/${marketSlug}`;
+        return `${POLYMARKET_WEB_BASE}/event/${marketSlug}`;
     }
 
-    return `https://polymarket.com/event/${market.conditionId || market.marketId}`;
+    return `${POLYMARKET_WEB_BASE}/event/${market.conditionId || market.marketId}`;
 }
 
 function buildKeyboard(signal, options = {}) {
@@ -151,13 +155,17 @@ function buildKeyboard(signal, options = {}) {
     if (!topMarket) {
         return undefined;
     }
+    const marketUrl = buildMarketUrl(topMarket);
+    if (!marketUrl) {
+        return undefined;
+    }
 
     const label = `🔗 ${truncate(topMarket.question, 24)}`;
 
     const keyboard = [[
         {
             text: label,
-            url: buildMarketUrl(topMarket)
+            url: marketUrl
         }
     ]];
 

@@ -5,6 +5,7 @@
  */
 
 const { t } = require('../../i18n');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 
 /**
  * 生成进度条
@@ -24,9 +25,12 @@ function getPreferredSlug(signal) {
 
 function buildMarketUrl(signal) {
     const slug = getPreferredSlug(signal);
+    if (!POLYMARKET_WEB_BASE) {
+        return null;
+    }
     return slug
-        ? `https://polymarket.com/event/${slug}`
-        : `https://polymarket.com/event/${signal.market}`;
+        ? `${POLYMARKET_WEB_BASE}/event/${slug}`
+        : `${POLYMARKET_WEB_BASE}/event/${signal.market}`;
 }
 
 /**

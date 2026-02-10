@@ -54,6 +54,13 @@ safe_load_env() {
 # 加载全局配置 → 服务配置
 safe_load_env "$PROJECT_ROOT/config/.env"
 # 配置已统一到 config/.env
+if [ -z "${BINANCE_PING_URL:-}" ]; then
+    if [ -n "${BINANCE_REST_BASE_MAINNET:-}" ]; then
+        BINANCE_PING_URL="${BINANCE_REST_BASE_MAINNET%/}/api/v3/ping"
+    elif [ -n "${BINANCE_FAPI_BASE:-}" ]; then
+        BINANCE_PING_URL="${BINANCE_FAPI_BASE%/}/fapi/v1/ping"
+    fi
+fi
 
 # ==================== 计算后端强制配置 ====================
 # 避免线程后端被 GIL 限制，默认走进程后端；如需覆盖，设置 FORCE_* 环境变量。
@@ -88,9 +95,11 @@ check_proxy() {
     local retries=3
     local delay=1
     local i=0
+    local ping_url="${BINANCE_PING_URL:-}"
+    [ -z "$ping_url" ] && return 0
     
     while [ $i -lt $retries ]; do
-        if curl -s --max-time 3 --proxy "$proxy" https://api.binance.com/api/v3/ping >/dev/null 2>&1; then
+        if curl -s --max-time 3 --proxy "$proxy" "$ping_url" >/dev/null 2>&1; then
             echo "✓ 代理可用: $proxy"
             return 0
         fi

@@ -8,7 +8,7 @@ const fetch = require('node-fetch');
 
 class OpinionRestClient {
     constructor(options = {}) {
-        this.host = options.host || process.env.OPINION_HOST || 'https://proxy.opinion.trade:8443';
+        this.host = options.host || process.env.OPINION_HOST || '';
         this.apiKey = options.apiKey || process.env.OPINION_API_KEY || '';
         
         // 缓存

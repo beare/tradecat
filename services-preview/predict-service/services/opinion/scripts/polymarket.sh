@@ -11,6 +11,8 @@ PROJECT_DIR="${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PROXY_CONFIG="${PROXY_CONFIG:-$PROJECT_DIR/proxychains.conf}"
 PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${PROXY_PORT:-9910}"
+PROXY_URL_SCHEME="${PROXY_URL_SCHEME:-http}"
+PROXY_URL_PREFIX="${PROXY_URL_SCHEME}://"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -159,7 +161,7 @@ start_client() {
                 fi
 
                 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo -e "${MAGENTA}📡 使用代理: http://$PROXY_HOST:$PROXY_PORT${NC}"
+                echo -e "${MAGENTA}📡 使用代理: ${PROXY_URL_PREFIX}$PROXY_HOST:$PROXY_PORT${NC}"
                 echo -e "${YELLOW}💡 按 Ctrl+C 停止程序${NC}"
                 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                 echo ""
@@ -199,7 +201,7 @@ start_client() {
             fi
 
             echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            echo -e "${MAGENTA}📡 使用代理: http://$PROXY_HOST:$PROXY_PORT${NC}"
+            echo -e "${MAGENTA}📡 使用代理: ${PROXY_URL_PREFIX}$PROXY_HOST:$PROXY_PORT${NC}"
             echo -e "${YELLOW}💡 按 Ctrl+C 停止程序${NC}"
             echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             echo ""

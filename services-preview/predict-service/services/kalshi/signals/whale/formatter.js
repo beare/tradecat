@@ -2,6 +2,13 @@
  * 大额交易信号格式化
  */
 
+const KALSHI_WEB_BASE = (process.env.KALSHI_WEB_BASE || '').replace(/\/$/, '');
+
+function buildMarketUrl(ticker) {
+  const marketPath = `/markets/${ticker}`;
+  return KALSHI_WEB_BASE ? `${KALSHI_WEB_BASE}${marketPath}` : marketPath;
+}
+
 function format(signal, market, translate = s => s) {
   const { trade, value, side, price } = signal;
   const title = translate(market?.title || signal.ticker);
@@ -23,7 +30,7 @@ ${emoji} *${title}*
 📊 方向: ${sideText} @ $${price.toFixed(2)}
 📦 数量: ${trade.count} 合约
 
-🔗 [查看市场](https://kalshi.com/markets/${signal.ticker})`;
+🔗 [查看市场](${buildMarketUrl(signal.ticker)})`;
 }
 
 module.exports = { format };

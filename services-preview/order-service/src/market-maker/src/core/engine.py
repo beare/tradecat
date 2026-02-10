@@ -32,7 +32,7 @@ class Engine:
 
     def __init__(self, exchange: str, api_key: str, api_secret: str,
                  testnet: bool = True, proxy: str = None, hedge_mode: bool = False,
-                 testnet_rest_base: str = "https://testnet.binancefuture.com",
+                 testnet_rest_base: str = "",
                  strict_no_rest_markets: bool = False, markets_path: str = "config/markets.json",
                  markets_sha256_path: Optional[str] = None,
                  flat_retries: int = 2, flat_retry_backoff: float = 0.5):
@@ -50,7 +50,7 @@ class Engine:
         self.strict_no_rest_markets = strict_no_rest_markets
         self.markets_path = Path(markets_path)
         self.markets_sha256_path = Path(markets_sha256_path) if markets_sha256_path else None
-        self.testnet_rest_base = (testnet_rest_base or "https://testnet.binancefuture.com").rstrip("/")
+        self.testnet_rest_base = (testnet_rest_base or "").rstrip("/")
 
         if testnet and exchange == "binanceusdm":
             self._setup_testnet()
@@ -96,6 +96,8 @@ class Engine:
     def _setup_testnet(self):
         self.exchange.set_sandbox_mode(True)
         base = self.testnet_rest_base
+        if not base:
+            return
         for key in ["fapiPublic", "fapiPrivate", "fapiPublicV2", "fapiPrivateV2", "fapi"]:
             if key in self.exchange.urls.get("api", {}):
                 self.exchange.urls["api"][key] = f"{base}/fapi/v1"

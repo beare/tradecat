@@ -6,16 +6,18 @@
 const https = require('https');
 const http = require('http');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const MYMEMORY_API_BASE = (process.env.MYMEMORY_API_BASE || '').replace(/\/$/, '');
 
 class MyMemoryTranslation {
   constructor() {
-    this.baseUrl = 'https://api.mymemory.translated.net/get';
+    this.baseUrl = MYMEMORY_API_BASE;
     this.proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
     this.agent = this.proxyUrl ? new HttpsProxyAgent(this.proxyUrl) : null;
   }
 
   async translate(text, from = 'en', to = 'zh') {
     if (!text || text.length < 2) return text;
+    if (!this.baseUrl) throw new Error('未配置 MYMEMORY_API_BASE');
     
     const url = `${this.baseUrl}?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
     

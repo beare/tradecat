@@ -1,20 +1,39 @@
 /**
  * Opinion Bot 配置文件
  */
-
+const fs = require('fs');
 const path = require('path');
-// 统一使用 tradecat/config/.env
-const projectRoot = path.resolve(__dirname, '../../../../../../');
+
+const resolveProjectRoot = () => {
+    const explicitRoot = process.env.TRADECAT_ROOT || process.env.PROJECT_ROOT;
+    if (explicitRoot) {
+        return explicitRoot;
+    }
+    let current = __dirname;
+    while (true) {
+        const dotenvCandidate = path.join(current, 'config', '.env');
+        if (fs.existsSync(dotenvCandidate)) {
+            return current;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) {
+            return process.cwd();
+        }
+        current = parent;
+    }
+};
+
+const projectRoot = resolveProjectRoot();
 const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath });
 
 module.exports = {
     // ==================== Opinion API ====================
     opinion: {
-        host: process.env.OPINION_HOST || 'https://proxy.opinion.trade:8443',
+        host: process.env.OPINION_HOST || '',
         apiKey: process.env.OPINION_API_KEY || '',
         chainId: Number(process.env.OPINION_CHAIN_ID || 56),
-        rpcUrl: process.env.OPINION_RPC_URL || 'https://bsc-dataseed.binance.org',
+        rpcUrl: process.env.OPINION_RPC_URL || '',
         pollInterval: Number(process.env.OPINION_POLL_INTERVAL || 10000), // 10秒轮询
         marketsCacheTTL: Number(process.env.OPINION_MARKETS_CACHE_TTL || 300000) // 5分钟缓存
     },
@@ -68,7 +87,7 @@ module.exports = {
         maxMarkets: Number(process.env.CLOSING_MAX_MARKETS || 9999),
         pageSize: Number(process.env.CLOSING_PAGE_SIZE || 10),
         refreshIntervalMs: Number(process.env.CLOSING_REFRESH_INTERVAL_MS || 300000),
-        opinionApi: process.env.OPINION_HOST || 'https://proxy.opinion.trade:8443',
+        opinionApi: process.env.OPINION_HOST || '',
         fetchTimeoutMs: Number(process.env.CLOSING_FETCH_TIMEOUT_MS || 15000),
         emitEmpty: process.env.CLOSING_EMIT_EMPTY === 'true',
         messageVariant: process.env.CLOSING_MESSAGE_VARIANT || 'list',
@@ -91,7 +110,7 @@ module.exports = {
     newMarket: {
         enabled: true,
         scanIntervalMs: Number(process.env.NEW_MARKET_SCAN_INTERVAL || 60000),
-        opinionApi: process.env.OPINION_HOST || 'https://proxy.opinion.trade:8443',
+        opinionApi: process.env.OPINION_HOST || '',
         limit: Number(process.env.NEW_MARKET_LIMIT || 500)
     },
 
@@ -101,7 +120,7 @@ module.exports = {
         trackTopN: 100,
         scanIntervalMs: 120000,
         minPositionValue: 500,
-        dataApi: process.env.OPINION_HOST || 'https://proxy.opinion.trade:8443',
+        dataApi: process.env.OPINION_HOST || '',
         thresholds: { 1: 100, 2: 500, 3: 2000 }
     },
 

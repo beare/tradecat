@@ -713,6 +713,19 @@ CI（`.github/workflows/ci.yml`）仅执行：
 | `ORDER_BOOK_DEPTH` | markets-service | 每侧档位数（默认 1000） |
 | `ORDER_BOOK_RETENTION_DAYS` | markets-service | 数据保留天数（默认 30） |
 
+### 10.5 外部地址配置
+
+| 变量 | 说明 |
+|:---|:---|
+| `BINANCE_WEB_BASE` | Telegram 卡片/快照中的 Binance 页面跳转前缀 |
+| `BINANCE_PING_URL` | 网络连通性探测地址（check_env/start 脚本使用） |
+| `SYMBOLS_ALL_URL` | 全市场币种清单地址（symbols 模块使用） |
+| `TELEGRAM_API_BASE` | Telegram API 基址（脚本与 Node 服务统一） |
+| `POLYMARKET_WEB_BASE` | Polymarket 页面链接前缀（Node 信号格式化） |
+| `KALSHI_WEB_BASE` | Kalshi 页面链接前缀（Node 信号格式化） |
+| `OPINION_WEB_BASE` | Opinion 页面链接前缀（Node 信号格式化） |
+| `NODEJS_SETUP_URL` | 远程部署脚本 Node.js 安装源地址 |
+
 ---
 
 ## 11. 快速参考卡片
@@ -750,3 +763,4 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 - 2026-01-29: Tradecat Preview API 新增 `/api/futures/base-data`（直读 SQLite 基础数据）。
 - 2026-02-01: 修复 data-service K线 REST 补齐在部分返回为字符串时间戳时的崩溃；新增 trading-service 类比预测脚本（15m 全历史检索相似窗口并输出未来分布）。
 - 2026-02-01: 新增 trading-service K线质量报告脚本（全历史缺口与近30天日条数校验），用于启动预测前的“是否齐全”自检。
+- 2026-02-10: 硬编码地址治理：Binance/Telegram/Polymarket/Kalshi/Opinion URL 统一迁移到环境变量，脚本与服务共享配置入口。

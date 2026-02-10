@@ -6,15 +6,19 @@
 
 const OrderbookAnalyzer = require('./analyzer');
 const { t } = require('../../i18n');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 
 /**
  * 构建市场URL（优先使用slug）
  */
 function buildMarketUrl(signal) {
     const slug = signal.eventSlug || signal.marketSlug;
+    if (!POLYMARKET_WEB_BASE) {
+        return null;
+    }
     return slug
-        ? `https://polymarket.com/event/${slug}`
-        : `https://polymarket.com/event/${signal.market}`;
+        ? `${POLYMARKET_WEB_BASE}/event/${slug}`
+        : `${POLYMARKET_WEB_BASE}/event/${signal.market}`;
 }
 
 /**

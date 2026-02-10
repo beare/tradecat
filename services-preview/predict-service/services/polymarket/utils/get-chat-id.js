@@ -7,6 +7,7 @@
  */
 
 const https = require('https');
+const TELEGRAM_API_BASE = (process.env.TELEGRAM_API_BASE || '').replace(/\/$/, '');
 
 const token = process.argv[2];
 
@@ -21,7 +22,12 @@ if (!token) {
 
 console.log('🔍 正在获取Chat ID...\n');
 
-const url = `https://api.telegram.org/bot${token}/getUpdates`;
+if (!TELEGRAM_API_BASE) {
+    console.error('❌ 错误: 未配置 TELEGRAM_API_BASE');
+    process.exit(1);
+}
+
+const url = `${TELEGRAM_API_BASE}/bot${token}/getUpdates`;
 
 https.get(url, (res) => {
     let data = '';

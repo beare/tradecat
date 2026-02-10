@@ -7,6 +7,7 @@
 // 市场元数据获取（用于补全名称/slug）
 const marketDataFetcher = require('../utils/marketData');
 const { t } = require('../i18n');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 
 class CommandHandler {
     constructor(bot, config, modules, userManager, actions = {}) {
@@ -741,21 +742,23 @@ class CommandHandler {
         const text = lines.join('\n');
 
         // 获取最新市场的链接
-        let latestUrl = 'https://polymarket.com';
-        if (allAlerts.length > 0) {
+        let latestUrl = POLYMARKET_WEB_BASE || null;
+        if (allAlerts.length > 0 && POLYMARKET_WEB_BASE) {
             const latest = allAlerts[allAlerts.length - 1];
             if (latest.eventSlug && latest.slug) {
-                latestUrl = `https://polymarket.com/event/${latest.eventSlug}?market=${latest.slug}`;
+                latestUrl = `${POLYMARKET_WEB_BASE}/event/${latest.eventSlug}?market=${latest.slug}`;
             } else if (latest.slug) {
-                latestUrl = `https://polymarket.com/market/${latest.slug}`;
+                latestUrl = `${POLYMARKET_WEB_BASE}/market/${latest.slug}`;
             }
         }
 
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '🔗 查看最新市场', url: latestUrl }]
-            ]
-        };
+        const keyboard = latestUrl
+            ? {
+                inline_keyboard: [
+                    [{ text: '🔗 查看最新市场', url: latestUrl }]
+                ]
+            }
+            : undefined;
 
         if (messageId) {
             try {
@@ -1435,6 +1438,7 @@ class CommandHandler {
         try {
             const { spawnSync } = require('child_process');
             const path = require('path');
+            const os = require('os');
             const fs = require('fs');
             
             const scriptPath = path.join(__dirname, '../scripts/csv-report.js');
@@ -1463,7 +1467,7 @@ class CommandHandler {
             // 保存为文件
             const date = new Date().toISOString().slice(0, 10);
             const fileName = `polymarket-report-${date}.csv`;
-            const filePath = `/tmp/${fileName}`;
+            const filePath = path.join(os.tmpdir(), fileName);
             fs.writeFileSync(filePath, csv);
             
             // 发送文件

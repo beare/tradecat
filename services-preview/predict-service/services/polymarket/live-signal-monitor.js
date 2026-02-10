@@ -65,9 +65,9 @@ const stats = {
 
 // 市场元数据缓存
 const marketCache = new Map();
-const CLOB_API_BASE = process.env.POLYMARKET_CLOB_API_BASE || 'https://clob.polymarket.com';
-const GAMMA_API_BASE = process.env.POLYMARKET_GAMMA_API_BASE || process.env.NEW_MARKET_GAMMA_API || 'https://gamma-api.polymarket.com';
-const DATA_API_BASE = process.env.POLYMARKET_DATA_API_BASE || process.env.SMART_MONEY_DATA_API || 'https://data-api.polymarket.com';
+const CLOB_API_BASE = process.env.POLYMARKET_CLOB_API_BASE || process.env.CLOB_API_BASE || '';
+const GAMMA_API_BASE = process.env.POLYMARKET_GAMMA_API_BASE || process.env.NEW_MARKET_GAMMA_API || process.env.GAMMA_API_BASE || '';
+const DATA_API_BASE = process.env.POLYMARKET_DATA_API_BASE || process.env.SMART_MONEY_DATA_API || process.env.DATA_API_BASE || '';
 
 // 初始化检测器 (降低阈值以便测试)
 const detectors = {

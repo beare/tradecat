@@ -3,10 +3,11 @@
  */
 
 const { t } = require('../../i18n');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || '').replace(/\/$/, '');
 
 function buildMarketUrl(signal) {
     const slug = signal.eventSlug || signal.marketSlug;
-    return slug ? `https://polymarket.com/event/${slug}` : null;
+    return slug && POLYMARKET_WEB_BASE ? `${POLYMARKET_WEB_BASE}/event/${slug}` : null;
 }
 
 function formatAmount(value) {

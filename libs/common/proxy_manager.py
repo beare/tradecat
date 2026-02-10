@@ -18,6 +18,16 @@ _proxy_disabled_until: float = 0
 _original_proxy: Optional[str] = None
 
 
+def _resolve_ping_url() -> Optional[str]:
+    explicit = os.environ.get("BINANCE_PING_URL")
+    if explicit:
+        return explicit
+    rest_base = (os.environ.get("BINANCE_REST_BASE_MAINNET") or os.environ.get("BINANCE_FAPI_BASE") or "").rstrip("/")
+    if rest_base:
+        return f"{rest_base}/fapi/v1/ping"
+    return None
+
+
 def get_proxy() -> Optional[str]:
     """获取代理，如果在冷却期则返回 None"""
     global _proxy_disabled_until, _original_proxy
@@ -47,11 +57,15 @@ def check_proxy() -> bool:
     proxy = get_proxy()
     if not proxy:
         return False
+    ping_url = _resolve_ping_url()
+    if not ping_url:
+        LOGGER.warning("未配置 BINANCE_PING_URL/BINANCE_REST_BASE_MAINNET/BINANCE_FAPI_BASE，跳过代理健康检查")
+        return True
     
     for i in range(PROXY_RETRY_COUNT):
         try:
             resp = requests.get(
-                "https://api.binance.com/api/v3/ping",
+                ping_url,
                 proxies={"http": proxy, "https": proxy},
                 timeout=3
             )
