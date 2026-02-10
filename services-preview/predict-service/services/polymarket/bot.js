@@ -24,6 +24,17 @@ if (process.env.HTTPS_PROXY && !process.env.GLOBAL_AGENT_HTTPS_PROXY) {
 // 用可控的连接池替代 global-agent：避免大量并发请求时把本机代理端口打爆
 require('./utils/globalProxy');
 
+// ==================== 兼容修复：request 自动代理导致崩溃 ====================
+// node-telegram-bot-api 底层依赖 request(@cypress/request)，会自动读取 *_PROXY 环境变量并走 tunnel-agent，
+// 在 Node22 + https-proxy-agent 组合下可能触发 TypeError（href of undefined）。
+// 我们已经通过 globalProxy 注入了全局 agent，这里清理 *_PROXY 变量，避免 request 自己再“套一层代理”。
+delete process.env.HTTP_PROXY;
+delete process.env.HTTPS_PROXY;
+delete process.env.http_proxy;
+delete process.env.https_proxy;
+delete process.env.GLOBAL_AGENT_HTTP_PROXY;
+delete process.env.GLOBAL_AGENT_HTTPS_PROXY;
+
 // 加载配置
 const config = require('./config/settings');
 
@@ -238,14 +249,20 @@ class PolymarketSignalBot {
             this.setupTelegramHandlers();
 
             // 确保 polling 已启动（防止代理或初始化异常导致未启动）
-            if (typeof this.telegramBot.isPolling === 'function' && !this.telegramBot.isPolling()) {
-                this.telegramBot.startPolling().catch((error) => {
-                    console.error('❌ Telegram polling 启动失败:', error?.message || error);
+            // - 只发信号、不接收命令/按钮回调的场景，可禁用 polling：POLYMARKET_DISABLE_TELEGRAM_POLLING=1
+            const pollingDisabled = String(process.env.POLYMARKET_DISABLE_TELEGRAM_POLLING || "").trim() === "1";
+            if (!pollingDisabled) {
+                if (typeof this.telegramBot.isPolling === 'function' && !this.telegramBot.isPolling()) {
+                    this.telegramBot.startPolling().catch((error) => {
+                        console.error('❌ Telegram polling 启动失败:', error?.message || error);
+                    });
+                }
+                this.telegramBot.on('polling_error', (error) => {
+                    console.error('❌ Telegram polling 错误:', error?.message || error);
                 });
+            } else {
+                console.log('⏸️ 已禁用 Telegram polling（仍可正常发消息）');
             }
-            this.telegramBot.on('polling_error', (error) => {
-                console.error('❌ Telegram polling 错误:', error?.message || error);
-            });
         }
 
         // 初始化翻译服务
@@ -337,7 +354,9 @@ class PolymarketSignalBot {
             { command: 'start', description: '🏠 打开主面板' },
             { command: 'help', description: '❓ 查看帮助' },
             { command: 'closing', description: '📋 最新扫尾盘' }
-        ]);
+        ]).catch((error) => {
+            console.warn('⚠️ 设置 Telegram 命令菜单失败（可忽略，不影响发信号）: %s', error?.message || error);
+        });
 
         // 处理Callback Query（内联按钮点击）
         this.telegramBot.on('callback_query', async (query) => {

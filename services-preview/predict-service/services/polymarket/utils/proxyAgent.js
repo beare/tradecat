@@ -92,6 +92,14 @@ function createHttpProxyAgent(proxyUrl) {
  * 为 Telegram Bot 配置代理
  */
 function getTelegramBotOptions() {
+    // ==================== 可控开关：禁用 polling ====================
+    // 背景：在部分环境（Node22 + request 代理链）下，polling 会持续报 EFATAL（href of undefined）。
+    // 对于“只发信号、不接收命令”的部署，可以禁用 polling 来避免噪音与无效重试。
+    // 启用方式：POLYMARKET_DISABLE_TELEGRAM_POLLING=1
+    if (String(process.env.POLYMARKET_DISABLE_TELEGRAM_POLLING || "").trim() === "1") {
+        return { polling: false };
+    }
+
     const proxyUrl = getProxyConfig();
 
     if (!proxyUrl) {
@@ -100,21 +108,15 @@ function getTelegramBotOptions() {
         };
     }
 
-    // Telegram polling 必须走代理，避免直连被阻断
-    if (proxyUrl.startsWith('socks')) {
-        return {
-            polling: true,
-            request: {
-                agentClass: SocksProxyAgent,
-                agentOptions: proxyUrl
-            }
-        };
-    }
-
+    // ==================== 兼容策略：禁止 request 自己处理 proxy ====================
+    // telegram SDK 底层用 request(@cypress/request)，它会在“自行处理代理”时走 tunnel-agent，
+    // 在某些环境下会触发 TypeError（href of undefined）。
+    // 本项目已通过 `utils/globalProxy` 注入全局 https/http agent（全局代理），这里强制 `proxy: null`
+    // 禁止 request 走 tunnel 分支，让它直接走全局 agent。
     return {
         polling: true,
         request: {
-            proxy: proxyUrl
+            proxy: null
         }
     };
 }
