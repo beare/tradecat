@@ -41,7 +41,7 @@ from pipeline.json_sink import append_jsonl, json_path
 
 logger = logging.getLogger(__name__)
 
-BINANCE_DATA_URL = "https://data.binance.vision"
+BINANCE_DATA_URL = settings.binance_data_base
 EXPECTED_1M_PER_DAY = 1440
 
 

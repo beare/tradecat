@@ -44,6 +44,7 @@ class MarketMaker:
             testnet=config.exchange.testnet,
             proxy=config.exchange.proxy,
             hedge_mode=config.exchange.hedge_mode,
+            testnet_rest_base=config.exchange.rest_base_testnet,
             strict_no_rest_markets=config.exchange.strict_no_rest_markets,
             markets_path=config.exchange.markets_path,
             markets_sha256_path=config.exchange.markets_sha256_path,
@@ -54,8 +55,8 @@ class MarketMaker:
             self.engine.validate_markets(config.strategy.symbols)
             logger.info("strict_no_rest_markets=ON 已加载预置 markets.json")
         # 用户数据流（持仓/订单私有 WS）
-        rest_base = "https://testnet.binancefuture.com" if config.exchange.testnet else "https://fapi.binance.com"
-        ws_base = "wss://stream.binancefuture.com" if config.exchange.testnet else "wss://fstream.binance.com"
+        rest_base = config.exchange.rest_base_testnet if config.exchange.testnet else config.exchange.rest_base_mainnet
+        ws_base = config.exchange.ws_base_testnet if config.exchange.testnet else config.exchange.ws_base_mainnet
         self.user_stream = BinanceUserStream(
             api_key=config.exchange.api_key,
             api_secret=config.exchange.api_secret,

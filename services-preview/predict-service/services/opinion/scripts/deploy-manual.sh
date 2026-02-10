@@ -4,10 +4,12 @@
 # 提示：服务器信息需通过环境变量提供，避免明文泄露
 # 变量：SERVER_IP、SERVER_USER、REMOTE_PATH、LOCAL_PATH
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEFAULT_LOCAL_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_IP="${SERVER_IP:?set SERVER_IP}"
 SERVER_USER="${SERVER_USER:-root}"
-REMOTE_PATH="${REMOTE_PATH:-/root/.projects/polymarket}"
-LOCAL_PATH="${LOCAL_PATH:-/home/lenovo/.projects/polymarket}"
+REMOTE_PATH="${REMOTE_PATH:-~/.projects/polymarket}"
+LOCAL_PATH="${LOCAL_PATH:-$DEFAULT_LOCAL_PATH}"
 
 echo "==================================="
 echo "Polymarket Bot Manual Deployment"

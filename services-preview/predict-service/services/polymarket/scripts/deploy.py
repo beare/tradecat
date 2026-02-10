@@ -4,13 +4,15 @@ import os
 import sys
 import subprocess
 import time
+from pathlib import Path
 
 # Configuration (env only to避免明文泄露)
 SERVER_IP = os.environ.get("SERVER_IP")
 SERVER_USER = os.environ.get("SERVER_USER", "root")
 SERVER_PASSWORD = os.environ.get("SERVER_PASSWORD")
-REMOTE_PATH = os.environ.get("REMOTE_PATH", "/root/.projects/polymarket")
-LOCAL_PATH = os.environ.get("LOCAL_PATH", "/home/lenovo/.projects/polymarket")
+REMOTE_PATH = os.environ.get("REMOTE_PATH", "~/.projects/polymarket")
+SCRIPT_DIR = Path(__file__).resolve().parent
+LOCAL_PATH = os.environ.get("LOCAL_PATH", str(SCRIPT_DIR.parent))
 
 if not SERVER_IP or not SERVER_PASSWORD:
     print("Missing SERVER_IP or SERVER_PASSWORD env vars.")

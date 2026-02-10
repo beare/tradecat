@@ -15,7 +15,8 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT_BASE="output_${TIMESTAMP}"
 
 # 项目路径
-PROJECT_DIR="/home/lenovo/.projects/fate-engine"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SERVICE_DIR="${PROJECT_DIR}/services/telegram-service/src"
 OUTPUT_DIR="${PROJECT_DIR}/services/telegram-service/output"
 

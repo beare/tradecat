@@ -60,6 +60,21 @@ class Settings:
     http_proxy: Optional[str] = field(default_factory=lambda: _env(
         "DATACAT_HTTP_PROXY", None, "HTTP_PROXY"
     ) or _env("DATACAT_HTTPS_PROXY", None, "HTTPS_PROXY"))
+    binance_fapi_base: str = field(default_factory=lambda: (
+        _env("DATACAT_BINANCE_FAPI_BASE", "https://fapi.binance.com", "BINANCE_FAPI_BASE") or "https://fapi.binance.com"
+    ).rstrip("/"))
+    binance_data_base: str = field(default_factory=lambda: (
+        _env("DATACAT_BINANCE_DATA_BASE", "https://data.binance.vision", "BINANCE_DATA_BASE")
+        or "https://data.binance.vision"
+    ).rstrip("/"))
+    binance_alpha_url: str = field(default_factory=lambda: (
+        _env(
+            "DATACAT_BINANCE_ALPHA_URL",
+            "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list",
+            "BINANCE_ALPHA_URL",
+        )
+        or "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list"
+    ))
 
     log_dir: Path = field(default_factory=lambda: Path(_env(
         "DATACAT_LOG_DIR",

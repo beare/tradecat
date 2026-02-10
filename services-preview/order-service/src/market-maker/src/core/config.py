@@ -24,6 +24,10 @@ class ExchangeConfig:
     api_secret: str = ""
     testnet: bool = True
     proxy: str = ""  # 从环境变量 HTTP_PROXY 读取
+    rest_base_mainnet: str = "https://fapi.binance.com"
+    rest_base_testnet: str = "https://testnet.binancefuture.com"
+    ws_base_mainnet: str = "wss://fstream.binance.com"
+    ws_base_testnet: str = "wss://stream.binancefuture.com"
     hedge_mode: bool = False  # 是否启用双向持仓模式（不再通过 REST 探测）
     strict_no_rest_markets: bool = False  # 是否预置 markets 以避免 load_markets 隐式 REST
     markets_path: str = "config/markets.json"  # 预置合约元数据路径
@@ -91,5 +95,9 @@ class Config:
                 api_secret=os.getenv("API_SECRET", ""),
                 testnet=os.getenv("TESTNET", "true").lower() == "true",
                 proxy=os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY") or "",
+                rest_base_mainnet=os.getenv("BINANCE_REST_BASE_MAINNET", "https://fapi.binance.com"),
+                rest_base_testnet=os.getenv("BINANCE_REST_BASE_TESTNET", "https://testnet.binancefuture.com"),
+                ws_base_mainnet=os.getenv("BINANCE_WS_BASE_MAINNET", "wss://fstream.binance.com"),
+                ws_base_testnet=os.getenv("BINANCE_WS_BASE_TESTNET", "wss://stream.binancefuture.com"),
             )
         )

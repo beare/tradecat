@@ -7,10 +7,21 @@
  */
 
 // 全局代理注入 - 必须在最开头
-require('dotenv').config();
+const path = require('path');
+const projectRoot = path.resolve(__dirname, '../../../../../');
+const dotenvPath = path.join(projectRoot, 'config', '.env');
+require('dotenv').config({ path: dotenvPath, override: true });
 const { bootstrap } = require('global-agent');
-process.env.GLOBAL_AGENT_HTTP_PROXY = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://127.0.0.1:9910';
-bootstrap();
+const monitorProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.OPINION_PROXY || process.env.DEFAULT_PROXY_URL;
+if (monitorProxy && !process.env.GLOBAL_AGENT_HTTP_PROXY) {
+    process.env.GLOBAL_AGENT_HTTP_PROXY = monitorProxy;
+}
+if (monitorProxy && !process.env.GLOBAL_AGENT_HTTPS_PROXY) {
+    process.env.GLOBAL_AGENT_HTTPS_PROXY = monitorProxy;
+}
+if (process.env.GLOBAL_AGENT_HTTP_PROXY || process.env.GLOBAL_AGENT_HTTPS_PROXY) {
+    bootstrap();
+}
 
 const fetch = require('node-fetch');
 
@@ -55,6 +66,9 @@ const stats = {
 
 // 市场元数据缓存
 const marketCache = new Map();
+const CLOB_API_BASE = process.env.CLOB_API_BASE || 'https://clob.polymarket.com';
+const GAMMA_API_BASE = process.env.GAMMA_API_BASE || 'https://gamma-api.polymarket.com';
+const DATA_API_BASE = process.env.DATA_API_BASE || 'https://data-api.polymarket.com';
 
 // 初始化检测器 (降低阈值以便测试)
 const detectors = {
@@ -161,7 +175,7 @@ async function fetchMarketMeta(conditionId) {
     }
     
     try {
-        const response = await fetch(`https://clob.polymarket.com/markets/${conditionId}`);
+        const response = await fetch(`${CLOB_API_BASE}/markets/${conditionId}`);
         if (response.ok) {
             const data = await response.json();
             const meta = {
@@ -248,7 +262,7 @@ async function scanNewMarkets() {
     }
     
     try {
-        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=500&order=createdAt&ascending=false');
+        const response = await fetch(`${GAMMA_API_BASE}/markets?active=true&closed=false&limit=500&order=createdAt&ascending=false`);
         if (!response.ok) return;
         
         const markets = await response.json();
@@ -281,7 +295,7 @@ async function scanSmartMoney() {
     
     try {
         // 获取排行榜 Top 100
-        const response = await fetch('https://data-api.polymarket.com/v1/leaderboard?limit=100');
+        const response = await fetch(`${DATA_API_BASE}/v1/leaderboard?limit=100`);
         if (!response.ok) return;
         
         const data = await response.json();
@@ -292,7 +306,7 @@ async function scanSmartMoney() {
             if (!address) continue;
             
             // 获取持仓
-            const posResponse = await fetch(`https://data-api.polymarket.com/positions?user=${address}&limit=50`);
+            const posResponse = await fetch(`${DATA_API_BASE}/positions?user=${address}&limit=50`);
             if (!posResponse.ok) continue;
             
             const positions = await posResponse.json();
@@ -401,7 +415,7 @@ async function subscribeToMarkets(ws) {
         
         // 分页获取全部活跃市场
         while (true) {
-            const response = await fetch(`https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=500&offset=${offset}`);
+            const response = await fetch(`${GAMMA_API_BASE}/markets?active=true&closed=false&limit=500&offset=${offset}`);
             if (!response.ok) break;
             
             const markets = await response.json();

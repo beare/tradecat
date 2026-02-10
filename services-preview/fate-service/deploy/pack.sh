@@ -2,9 +2,10 @@
 # Fate-Engine 打包脚本 - 本地执行
 set -e
 
-ROOT="/home/lenovo/.projects/fate-engine"
-OUT="/home/lenovo/.projects/fate-engine-deploy"
-ARCHIVE="/home/lenovo/.projects/fate-engine-deploy.tar.gz"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+OUT="${OUT:-${ROOT}-deploy}"
+ARCHIVE="${ARCHIVE:-${OUT}.tar.gz}"
 
 echo "==> 清理旧包"
 rm -rf "$OUT" "$ARCHIVE"
@@ -98,7 +99,7 @@ EOF
 chmod +x "$OUT/install.sh"
 
 echo "==> 打包"
-cd "$(dirname $OUT)"
+cd "$(dirname "$OUT")"
 tar -czvf "$ARCHIVE" "$(basename $OUT)"
 
 echo ""

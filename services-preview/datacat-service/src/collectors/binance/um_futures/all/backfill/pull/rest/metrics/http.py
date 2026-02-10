@@ -490,7 +490,7 @@ class GapScanner:
 class MetricsRestBackfiller:
     """Metrics REST API 补齐"""
 
-    FAPI = "https://fapi.binance.com"
+    FAPI = settings.binance_fapi_base
 
     def __init__(self, ts: TimescaleAdapter, workers: int = 3):
         self._ts = ts

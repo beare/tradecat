@@ -6,12 +6,12 @@
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
-const DEFAULT_PROXY_URL = 'http://127.0.0.1:7890';
+const DEFAULT_PROXY_URL = process.env.POLYMARKET_PROXY || process.env.DEFAULT_PROXY_URL || '';
 
 // ==================== Agent 单例缓存（避免连接风暴） ====================
 // 关键点：
 // - 以前每次 getFetchProxyOptions()/createHttpProxyAgent() 都 new 一个 Agent
-// - 会导致并发请求下产生海量 socket（全部连到 127.0.0.1:7890），最终打爆端口/FD
+// - 会导致并发请求下产生海量 socket（全部连到本地代理），最终打爆端口/FD
 // - 这里改为“按 proxyUrl 缓存一个 Agent”，并限制 maxSockets
 let cachedProxyUrl = null;
 let cachedHttpProxyAgent = null;

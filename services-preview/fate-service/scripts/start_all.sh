@@ -6,8 +6,14 @@
 
 set -euo pipefail
 
-ROOT="/home/lenovo/.projects/fate-engine"
-ENV_FILE="/home/lenovo/.projects/fate-engine-env/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+DEFAULT_ENV_FILE="$ROOT/.env"
+LEGACY_ENV_FILE="$HOME/.projects/fate-engine-env/.env"
+ENV_FILE="${ENV_FILE:-$DEFAULT_ENV_FILE}"
+if [[ ! -f "$ENV_FILE" && -f "$LEGACY_ENV_FILE" ]]; then
+  ENV_FILE="$LEGACY_ENV_FILE"
+fi
 SERVICE_DIR="$ROOT/services/telegram-service"
 LOG_DIR="$SERVICE_DIR/output/logs"
 

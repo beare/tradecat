@@ -1412,11 +1412,27 @@ def _fetch_ridge_data_from_db(symbol: str, interval: str, periods: int = 10, loo
     """
     import os
     import sys
+    from pathlib import Path
 
-    # 添加 trading-service 路径
-    trading_service_path = os.path.join(os.path.dirname(__file__), "../../../../services/trading-service/src")
-    if trading_service_path not in sys.path:
-        sys.path.insert(0, os.path.abspath(trading_service_path))
+    # 添加 trading-service 路径（优先环境变量，失败后自动向上搜索仓库根）
+    configured_path = os.getenv("VIS_TRADING_SERVICE_SRC")
+    if configured_path:
+        trading_service_path = Path(configured_path).expanduser().resolve()
+    else:
+        trading_service_path = None
+        current = Path(__file__).resolve()
+        for parent in current.parents:
+            candidate = parent / "services" / "trading-service" / "src"
+            if candidate.exists():
+                trading_service_path = candidate
+                break
+    if not trading_service_path or not trading_service_path.exists():
+        logger.warning("未找到 trading-service src 路径，可通过 VIS_TRADING_SERVICE_SRC 配置")
+        return [], []
+
+    path_str = str(trading_service_path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
     try:
         from indicators.batch.vpvr import compute_vpvr_ridge_data

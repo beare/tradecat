@@ -4,12 +4,23 @@
  * 数据源: Opinion WebSocket + REST API
  */
 
-// 强制全局代理
-process.env.GLOBAL_AGENT_HTTP_PROXY = 'http://127.0.0.1:9910';
-process.env.GLOBAL_AGENT_HTTPS_PROXY = 'http://127.0.0.1:9910';
-require('dotenv').config();
+const path = require('path');
+const projectRoot = path.resolve(__dirname, '../../../../../');
+const dotenvPath = path.join(projectRoot, 'config', '.env');
+require('dotenv').config({ path: dotenvPath, override: true });
 const { bootstrap } = require('global-agent');
-bootstrap();
+const fallbackProxy = process.env.OPINION_PROXY || process.env.DEFAULT_PROXY_URL || '';
+const httpProxy = process.env.HTTP_PROXY || process.env.HTTPS_PROXY || fallbackProxy;
+const httpsProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || fallbackProxy;
+if (httpProxy && !process.env.GLOBAL_AGENT_HTTP_PROXY) {
+    process.env.GLOBAL_AGENT_HTTP_PROXY = httpProxy;
+}
+if (httpsProxy && !process.env.GLOBAL_AGENT_HTTPS_PROXY) {
+    process.env.GLOBAL_AGENT_HTTPS_PROXY = httpsProxy;
+}
+if (process.env.GLOBAL_AGENT_HTTP_PROXY || process.env.GLOBAL_AGENT_HTTPS_PROXY) {
+    bootstrap();
+}
 
 const config = require('./config/settings');
 const OpinionWebSocket = require('./clients/opinion-ws');

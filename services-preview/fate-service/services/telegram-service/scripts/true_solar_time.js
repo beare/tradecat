@@ -8,10 +8,38 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+function resolvePaipanPath() {
+  const envPath = process.env.PAIPAN_JS_PATH;
+  if (envPath && fs.existsSync(envPath)) {
+    return path.resolve(envPath);
+  }
+
+  let current = path.resolve(__dirname);
+  while (true) {
+    const candidate = path.join(
+      current,
+      'libs',
+      'external',
+      'github',
+      'paipan-master',
+      'js',
+      'paipan.js'
+    );
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  throw new Error('paipan.js not found, please set PAIPAN_JS_PATH');
+}
+
 function loadPaipan() {
   const code = fs.readFileSync(
-    // 从 scripts/ 回到仓库根：../../../
-    path.resolve(__dirname, '../../../libs/external/github/paipan-master/js/paipan.js'),
+    resolvePaipanPath(),
     'utf-8'
   );
   const sandbox = { window: {}, console };

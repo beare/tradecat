@@ -5,12 +5,16 @@
 # 自动检测网络，智能启动Telegram信号Bot
 # ============================================================================
 
-# 项目配置
-PROJECT_DIR="/home/lenovo/.projects/polymarket"
-BOT_DIR="$PROJECT_DIR/bot"
-PROXY_CONFIG="$PROJECT_DIR/proxychains.conf"
-PROXY_HOST="127.0.0.1"
-PROXY_PORT="9910"
+# 项目配置（支持环境变量覆盖，默认按脚本位置推导）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+BOT_DIR="${BOT_DIR:-$PROJECT_DIR/bot}"
+if [ ! -d "$BOT_DIR" ] && [ -d "$PROJECT_DIR" ]; then
+    BOT_DIR="$PROJECT_DIR"
+fi
+PROXY_CONFIG="${PROXY_CONFIG:-$PROJECT_DIR/proxychains.conf}"
+PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
+PROXY_PORT="${PROXY_PORT:-9910}"
 
 # 颜色定义
 RED='\033[0;31m'

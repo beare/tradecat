@@ -6,11 +6,11 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=lenovo
-WorkingDirectory=/home/lenovo/.projects/fate-engine/services/telegram-service
+User=%u
+WorkingDirectory=%h/.projects/fate-engine/services/telegram-service
 Environment="PYTHONUNBUFFERED=1"
-EnvironmentFile=/home/lenovo/.projects/fate-engine-env/.env
-ExecStart=/bin/bash -lc 'source /home/lenovo/.projects/fate-engine/.venv/bin/activate && python start.py bot'
+EnvironmentFile=%h/.projects/fate-engine-env/.env
+ExecStart=/bin/bash -lc 'source %h/.projects/fate-engine/.venv/bin/activate && python start.py bot'
 Restart=always
 RestartSec=5
 TimeoutStopSec=15

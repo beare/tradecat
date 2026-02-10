@@ -2,7 +2,10 @@
 # 下载八字排盘相关开源库到 libs/external/
 
 set -e
-cd /home/lenovo/.projects/fate-engine/libs/external
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+EXTERNAL_DIR="${EXTERNAL_DIR:-$PROJECT_DIR/libs/external}"
+cd "$EXTERNAL_DIR"
 
 download_repo() {
     local repo=$1

@@ -38,7 +38,7 @@ def _http_check() -> Dict[str, Any]:
     result = {"ok": False, "error": None, "status": None}
     proxies = {"http": settings.http_proxy, "https": settings.http_proxy} if settings.http_proxy else None
     try:
-        resp = requests.get("https://fapi.binance.com/fapi/v1/ping", timeout=5, proxies=proxies)
+        resp = requests.get(f"{settings.binance_fapi_base}/fapi/v1/ping", timeout=5, proxies=proxies)
         result["status"] = resp.status_code
         result["ok"] = resp.status_code == 200
     except Exception as exc:  # noqa: BLE001

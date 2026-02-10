@@ -14,6 +14,7 @@
 import subprocess
 import json
 import os
+import tempfile
 from datetime import datetime
 from typing import Dict, Any
 
@@ -127,13 +128,21 @@ class FortelZiweiCalculator:
         }}
         """
         
-        temp_file = '/tmp/native_iztro.js'
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            f.write(js_script)
-        
-        env = dict(os.environ)
-        env["TZ"] = "Asia/Shanghai"
-        result = subprocess.run(['node', temp_file], capture_output=True, text=True, timeout=30, env=env)
+        temp_file = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.js', prefix='native_iztro_', delete=False, encoding='utf-8') as f:
+                f.write(js_script)
+                temp_file = f.name
+
+            env = dict(os.environ)
+            env["TZ"] = "Asia/Shanghai"
+            result = subprocess.run(['node', temp_file], capture_output=True, text=True, timeout=30, env=env)
+        finally:
+            if temp_file:
+                try:
+                    os.remove(temp_file)
+                except OSError:
+                    pass
         
         if result.returncode != 0:
             raise RuntimeError(f"iztro原生算法执行失败: {result.stderr}")

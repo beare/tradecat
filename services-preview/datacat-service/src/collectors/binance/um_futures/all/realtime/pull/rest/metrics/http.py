@@ -37,7 +37,7 @@ from pipeline.json_sink import append_jsonl, json_path
 
 logger = logging.getLogger(__name__)
 
-FAPI = "https://fapi.binance.com"
+FAPI = settings.binance_fapi_base
 
 
 # ==================== 基础工具：Metrics ====================

@@ -2,11 +2,13 @@
 
 # Deployment configuration
 # 强制从环境变量读取，避免明文暴露
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEFAULT_LOCAL_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_IP="${SERVER_IP:?set SERVER_IP}"
 SERVER_USER="${SERVER_USER:-root}"
 SERVER_PASSWORD="${SERVER_PASSWORD:?set SERVER_PASSWORD}"
-REMOTE_PATH="${REMOTE_PATH:-/root/.projects/polymarket}"
-LOCAL_PATH="${LOCAL_PATH:-/home/lenovo/.projects/polymarket}"
+REMOTE_PATH="${REMOTE_PATH:-~/.projects/polymarket}"
+LOCAL_PATH="${LOCAL_PATH:-$DEFAULT_LOCAL_PATH}"
 
 echo "==================================="
 echo "Polymarket Bot Deployment Script"
@@ -62,8 +64,8 @@ sshpass -p "$SERVER_PASSWORD" rsync -avz --progress \
 
 # Install dependencies and setup
 echo "Installing dependencies on server..."
-sshpass -p "$SERVER_PASSWORD" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" bash << 'REMOTE_SCRIPT'
-cd /root/.projects/polymarket
+sshpass -p "$SERVER_PASSWORD" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "REMOTE_PATH='$REMOTE_PATH' bash" << 'REMOTE_SCRIPT'
+cd "$REMOTE_PATH"
 
 echo "Checking Node.js installation..."
 if ! command -v node &> /dev/null; then

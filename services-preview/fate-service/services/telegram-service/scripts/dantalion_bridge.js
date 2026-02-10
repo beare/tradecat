@@ -6,6 +6,7 @@
  * 输出：单行 JSON 字符串，如失败输出错误到 stderr 并返回非零
  */
 const path = require('path');
+const fs = require('fs');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -23,7 +24,36 @@ function parseArgs() {
 
 function main() {
   const { birth } = parseArgs();
-  const corePath = path.resolve(__dirname, '../../../libs/external/github/dantalion-master/packages/dantalion-core/dist/index.js');
+  const envPath = process.env.DANTALION_CORE_PATH;
+  let corePath = envPath && path.resolve(envPath);
+  if (!corePath || !fs.existsSync(corePath)) {
+    let current = path.resolve(__dirname);
+    while (true) {
+      const candidate = path.join(
+        current,
+        'libs',
+        'external',
+        'github',
+        'dantalion-master',
+        'packages',
+        'dantalion-core',
+        'dist',
+        'index.js'
+      );
+      if (fs.existsSync(candidate)) {
+        corePath = candidate;
+        break;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) {
+        break;
+      }
+      current = parent;
+    }
+  }
+  if (!corePath || !fs.existsSync(corePath)) {
+    throw new Error('dantalion-core not found, please set DANTALION_CORE_PATH');
+  }
   const core = require(corePath);
   if (!core.getPersonality) {
     throw new Error('dantalion-core getPersonality not found');
