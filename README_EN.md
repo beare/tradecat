@@ -207,7 +207,7 @@ vim config/.env
   - `BOT_TOKEN` (Telegram Bot Token)  
   - `TELEGRAM_GROUP_WHITELIST` (comma-separated group IDs; empty = private chats only; group messages require `/` or `!` prefix + @bot mention)  
   - `HTTP_PROXY` / `HTTPS_PROXY` (if proxy needed)  
-  - External endpoints: `BINANCE_WEB_BASE`, `BINANCE_PING_URL`, `SYMBOLS_ALL_URL`, `TELEGRAM_API_BASE`, `POLYMARKET_WEB_BASE`, `KALSHI_WEB_BASE`, `OPINION_WEB_BASE`, `NODEJS_SETUP_URL`
+  - External endpoints: `BINANCE_WEB_BASE`, `BINANCE_PING_URL`, `SYMBOLS_ALL_URL`, `TELEGRAM_API_BASE`, `POLYMARKET_WEB_BASE`, `KALSHI_WEB_BASE`, `OPINION_WEB_BASE`, `NODEJS_SETUP_URL`, `NOFX_*`
   - Symbols/intervals: `SYMBOLS_GROUPS`, `SYMBOLS_EXTRA`, `SYMBOLS_EXCLUDE`, `INTERVALS`, `KLINE_INTERVALS`, `FUTURES_INTERVALS`  
   - Collection/compute: `BACKFILL_MODE`/`BACKFILL_DAYS`/`BACKFILL_ON_START`, `MAX_CONCURRENT`, `RATE_LIMIT_PER_MINUTE`  
   - Defaults: `BACKFILL_MODE=all` (full backfill; if `BACKFILL_START_DATE` is set, calculates days from start date; otherwise ~10 years), `SYMBOLS_GROUPS=main4` (only BTC/ETH/SOL/BNB; for full market use `all` or custom groups)  
