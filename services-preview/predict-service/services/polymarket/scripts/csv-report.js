@@ -16,7 +16,8 @@ const projectRoot = path.resolve(__dirname, '../../../../../');
 const dotenvPath = path.join(projectRoot, 'config', '.env');
 require('dotenv').config({ path: dotenvPath, override: true });
 
-const GAMMA_API = 'https://gamma-api.polymarket.com';
+const GAMMA_API = (process.env.POLYMARKET_GAMMA_API_BASE || process.env.GAMMA_API_BASE || 'https://gamma-api.polymarket.com')
+  .replace(/\/$/, '');
 const TRANSLATE_ENABLED = process.env.CSV_TRANSLATE !== 'false';
 const TRANSLATE_MAX = Number(process.env.CSV_TRANSLATE_MAX || 120);
 const TRANSLATE_CACHE_FILE = process.env.CSV_TRANSLATE_CACHE_FILE || path.join(__dirname, '../data/translation-cache.json');

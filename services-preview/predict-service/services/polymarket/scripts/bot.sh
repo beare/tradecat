@@ -7,18 +7,18 @@
 
 # 项目配置
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 if [ -d "$PROJECT_DIR/bot" ]; then
-    BOT_DIR="$PROJECT_DIR/bot"
+    BOT_DIR="${BOT_DIR:-$PROJECT_DIR/bot}"
 else
-    BOT_DIR="$PROJECT_DIR"
+    BOT_DIR="${BOT_DIR:-$PROJECT_DIR}"
 fi
-PROXY_CONFIG="$PROJECT_DIR/proxychains.conf"
+PROXY_CONFIG="${PROXY_CONFIG:-$PROJECT_DIR/proxychains.conf}"
 if [ ! -f "$PROXY_CONFIG" ] && [ -f "/etc/proxychains.conf" ]; then
     PROXY_CONFIG="/etc/proxychains.conf"
 fi
-PROXY_HOST="127.0.0.1"
-PROXY_PORT="7890"
+PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
+PROXY_PORT="${PROXY_PORT:-7890}"
 
 # 颜色定义
 RED='\033[0;31m'

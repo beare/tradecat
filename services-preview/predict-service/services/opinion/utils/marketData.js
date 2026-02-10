@@ -9,6 +9,10 @@ const https = require('https');
 const REQUEST_TIMEOUT_MS = 3000;
 const CACHE_TTL_MS = 30 * 60 * 1000;  // 30分钟
 const CACHE_MAX_SIZE = 200000;         // 20万条
+const CLOB_API_BASE = (process.env.CLOB_API_BASE || process.env.POLYMARKET_CLOB_API_BASE || 'https://clob.polymarket.com').replace(/\/$/, '');
+const GAMMA_API_BASE = (process.env.GAMMA_API_BASE || process.env.POLYMARKET_GAMMA_API_BASE || 'https://gamma-api.polymarket.com')
+    .replace(/\/$/, '');
+const POLYMARKET_WEB_BASE = (process.env.POLYMARKET_WEB_BASE || 'https://polymarket.com').replace(/\/$/, '');
 
 class MarketDataFetcher {
     constructor() {
@@ -84,7 +88,7 @@ class MarketDataFetcher {
      */
     fetchMarketData(conditionId) {
         return new Promise((resolve, reject) => {
-            const url = `https://clob.polymarket.com/markets/${conditionId}`;
+            const url = `${CLOB_API_BASE}/markets/${conditionId}`;
             const req = https.get(url, (res) => {
                 let data = '';
 
@@ -174,11 +178,11 @@ class MarketDataFetcher {
         const slug = await this.getEventSlug(conditionId);
 
         if (slug) {
-            return `https://polymarket.com/event/${slug}`;
+            return `${POLYMARKET_WEB_BASE}/event/${slug}`;
         }
 
         // 如果无法获取slug，降级使用conditionId（虽然可能无效）
-        return `https://polymarket.com/event/${conditionId}`;
+        return `${POLYMARKET_WEB_BASE}/event/${conditionId}`;
     }
 
     /**
@@ -196,14 +200,14 @@ class MarketDataFetcher {
         try {
             const fetch = require('node-fetch');
             // 先尝试 condition_id，再尝试 clob_token_ids
-            let res = await fetch(`https://gamma-api.polymarket.com/markets?condition_id=${conditionId}`, {
+            let res = await fetch(`${GAMMA_API_BASE}/markets?condition_id=${conditionId}`, {
                 timeout: this.requestTimeoutMs
             });
             let markets = res.ok ? await res.json() : [];
             
             // 如果没找到，尝试用 clob_token_ids 查询
             if (!markets || !markets.length) {
-                res = await fetch(`https://gamma-api.polymarket.com/markets?clob_token_ids=${conditionId}`, {
+                res = await fetch(`${GAMMA_API_BASE}/markets?clob_token_ids=${conditionId}`, {
                     timeout: this.requestTimeoutMs
                 });
                 markets = res.ok ? await res.json() : [];

@@ -1,5 +1,9 @@
 const fetch = require('node-fetch');
 const { getFetchProxyOptions } = require('../../utils/proxyAgent');
+const DEFAULT_GAMMA_API = process.env.POLYMARKET_GAMMA_API_BASE
+    || process.env.NEW_MARKET_GAMMA_API
+    || process.env.GAMMA_API_BASE
+    || 'https://gamma-api.polymarket.com';
 
 /**
  * 扫尾盘检测器 (SDK 版本)
@@ -19,7 +23,7 @@ class ClosingMarketScanner {
         this.minAbsoluteThreshold = config.minAbsoluteThreshold || 0;
         this.maxMarkets = config.maxMarkets || 10;
         this.refreshIntervalMs = config.refreshIntervalMs || 300000;
-        this.gammaApi = config.gammaApi || 'https://gamma-api.polymarket.com';
+        this.gammaApi = config.gammaApi || DEFAULT_GAMMA_API;
         this.fetchTimeoutMs = config.fetchTimeoutMs || 15000;
         this.emitEmpty = config.emitEmpty === true;
         this.debug = Boolean(config.debug);
@@ -142,7 +146,7 @@ class ClosingMarketScanner {
         const allMarkets = [];
         let offset = 0;
         const limit = 500;
-        const baseUrl = (this.gammaApi || 'https://gamma-api.polymarket.com').replace(/\/$/, '');
+        const baseUrl = (this.gammaApi || DEFAULT_GAMMA_API).replace(/\/$/, '');
         const fetchProxyOptions = getFetchProxyOptions();
 
         while (true) {

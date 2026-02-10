@@ -33,7 +33,7 @@ from ..schema_adapter import get_kline_table, get_kline_time_field, get_metrics_
 
 logger = logging.getLogger(__name__)
 
-BINANCE_DATA_URL = "https://data.binance.vision"
+BINANCE_DATA_URL = settings.binance_data_base
 EXPECTED_1M_PER_DAY = 1440  # 1分钟 * 1440 = 1天
 EXPECTED_5M_PER_DAY = 288   # 5分钟 * 288 = 1天
 
@@ -209,7 +209,7 @@ class RestBackfiller:
 class MetricsRestBackfiller:
     """Metrics REST API 补齐 (用于 ZIP 未产出的近日数据)"""
 
-    FAPI = "https://fapi.binance.com"
+    FAPI = settings.binance_fapi_base
 
     def __init__(self, ts: TimescaleAdapter, workers: int = 3):
         self._ts = ts

@@ -25,11 +25,17 @@ if _env_file.exists():
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 
-# 强制代理为 9910（与外部采集测试保持一致）
-os.environ["http_proxy"] = "http://127.0.0.1:9910"
-os.environ["https_proxy"] = "http://127.0.0.1:9910"
-os.environ["HTTP_PROXY"] = "http://127.0.0.1:9910"
-os.environ["HTTPS_PROXY"] = "http://127.0.0.1:9910"
+def _apply_proxy_defaults() -> None:
+    default_proxy = os.getenv("MARKETS_SERVICE_DEFAULT_PROXY") or os.getenv("DEFAULT_PROXY_URL")
+    if not default_proxy:
+        return
+    os.environ.setdefault("http_proxy", default_proxy)
+    os.environ.setdefault("https_proxy", default_proxy)
+    os.environ.setdefault("HTTP_PROXY", default_proxy)
+    os.environ.setdefault("HTTPS_PROXY", default_proxy)
+
+
+_apply_proxy_defaults()
 
 
 def _int_env(name: str, default: int) -> int:
@@ -94,6 +100,16 @@ class Settings:
 
     # 代理
     http_proxy: Optional[str] = field(default_factory=lambda: os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY"))
+    binance_fapi_base: str = field(default_factory=lambda: (
+        os.getenv("MARKETS_SERVICE_BINANCE_FAPI_BASE")
+        or os.getenv("BINANCE_FAPI_BASE")
+        or "https://fapi.binance.com"
+    ).rstrip("/"))
+    binance_data_base: str = field(default_factory=lambda: (
+        os.getenv("MARKETS_SERVICE_BINANCE_DATA_BASE")
+        or os.getenv("BINANCE_DATA_BASE")
+        or "https://data.binance.vision"
+    ).rstrip("/"))
 
     # 目录
     log_dir: Path = field(default_factory=lambda: SERVICE_ROOT / "logs")

@@ -4,6 +4,10 @@
  * 数据源: poly-sdk Gamma API
  * 职责: 扫描即将结束的高确定性市场
  */
+const DEFAULT_GAMMA_API = process.env.GAMMA_API_BASE
+    || process.env.POLYMARKET_GAMMA_API_BASE
+    || process.env.NEW_MARKET_GAMMA_API
+    || 'https://gamma-api.polymarket.com';
 
 class ClosingMarketScanner {
     constructor(config = {}) {
@@ -148,7 +152,8 @@ class ClosingMarketScanner {
                 ascending: 'true'
             });
 
-            const url = `https://gamma-api.polymarket.com/markets?${params}`;
+            const baseUrl = DEFAULT_GAMMA_API.replace(/\/$/, '');
+            const url = `${baseUrl}/markets?${params}`;
             const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);

@@ -22,7 +22,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-FAPI = "https://fapi.binance.com"
+FAPI = settings.binance_fapi_base
 
 
 # 配置连接池

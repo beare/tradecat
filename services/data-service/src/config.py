@@ -35,6 +35,21 @@ class Settings:
         "DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data"
     ))
     http_proxy: Optional[str] = field(default_factory=lambda: os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY"))
+    binance_fapi_base: str = field(default_factory=lambda: (
+        os.getenv("DATA_SERVICE_BINANCE_FAPI_BASE")
+        or os.getenv("BINANCE_FAPI_BASE")
+        or "https://fapi.binance.com"
+    ).rstrip("/"))
+    binance_data_base: str = field(default_factory=lambda: (
+        os.getenv("DATA_SERVICE_BINANCE_DATA_BASE")
+        or os.getenv("BINANCE_DATA_BASE")
+        or "https://data.binance.vision"
+    ).rstrip("/"))
+    binance_alpha_url: str = field(default_factory=lambda: (
+        os.getenv("DATA_SERVICE_BINANCE_ALPHA_URL")
+        or os.getenv("BINANCE_ALPHA_URL")
+        or "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list"
+    ))
 
     # 日志和数据目录改为项目内
     log_dir: Path = field(default_factory=lambda: Path(os.getenv(
