@@ -1,0 +1,833 @@
+"""
+数据库读写（高性能版）
+
+优化点：
+1. PG 连接池复用 + 扩大池大小
+2. 多周期并行查询
+3. 批量 SQL 查询（IN 子句）
+4. 批量写入
+"""
+import threading
+import logging
+import math
+import json
+import os
+from datetime import datetime, timezone
+from typing import Dict, List, Sequence
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pandas as pd
+from psycopg import sql
+from psycopg import OperationalError, InterfaceError
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
+
+from ..config import config, get_market_candles_table
+from ..observability import metrics
+
+from assets.common.lineage.lineage_writer import emit_lineage_event
+
+LOG = logging.getLogger("indicator_service.db")
+_pg_query_total = metrics.counter("pg_query_total", "PG 查询次数")
+_pg_write_total = metrics.counter("pg_write_total", "PG 写入次数")
+
+LINEAGE_ACTOR_ID = "plugins/trading"
+LINEAGE_RESOURCE_LEGACY = "derived/indicator_snapshots/legacy_tables"
+LINEAGE_RESOURCE_SNAPSHOTS = "derived/indicator_snapshots/snapshots"
+LINEAGE_RUN_ID = (os.getenv("LINEAGE_RUN_ID") or "").strip() or f"trading_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}_{os.getpid()}"
+
+def _emit_lineage_safe(*, resource_id: str, status: str, meta: dict) -> None:
+    """写入血缘事件（fail-soft）。"""
+    try:
+        emit_lineage_event(
+            dsn=config.derived_db_url,
+            actor_id=LINEAGE_ACTOR_ID,
+            run_id=LINEAGE_RUN_ID,
+            action="produce",
+            resource_id=resource_id,
+            status=status,
+            occurred_at=datetime.now(timezone.utc),
+            meta=meta,
+        )
+    except Exception:
+        return
+
+
+# 共享 PG 连接池（默认行工厂）
+_shared_facts_pg_pool: ConnectionPool | None = None
+_shared_facts_pg_pool_lock = threading.Lock()
+_shared_derived_pg_pool: ConnectionPool | None = None
+_shared_derived_pg_pool_lock = threading.Lock()
+
+
+def _candles_table(interval: str) -> str:
+    return get_market_candles_table(interval)
+
+
+def get_db_counters() -> Dict[str, float]:
+    """获取 DB 计数器快照"""
+    return {
+        "pg_query_total": _pg_query_total.get(),
+        "pg_write_total": _pg_write_total.get(),
+    }
+
+
+def inc_pg_query():
+    """记录 PG 查询次数"""
+    _pg_query_total.inc()
+
+def inc_pg_write():
+    """记录 PG 写入次数"""
+    _pg_write_total.inc()
+
+
+def get_shared_pg_pool() -> ConnectionPool:
+    """获取共享 facts 连接池"""
+    global _shared_facts_pg_pool
+    if _shared_facts_pg_pool is None:
+        with _shared_facts_pg_pool_lock:
+            if _shared_facts_pg_pool is None:
+                _shared_facts_pg_pool = ConnectionPool(
+                    config.facts_db_url,
+                    min_size=1,
+                    max_size=10,
+                    timeout=30,
+                    kwargs={"connect_timeout": 3},
+                )
+    return _shared_facts_pg_pool
+
+
+def get_shared_indicator_pg_pool() -> ConnectionPool:
+    """获取共享 derived 连接池"""
+    global _shared_derived_pg_pool
+    if _shared_derived_pg_pool is None:
+        with _shared_derived_pg_pool_lock:
+            if _shared_derived_pg_pool is None:
+                _shared_derived_pg_pool = ConnectionPool(
+                    config.derived_db_url,
+                    min_size=1,
+                    max_size=10,
+                    timeout=30,
+                    kwargs={"connect_timeout": 3},
+                )
+    return _shared_derived_pg_pool
+
+
+def reset_shared_pg_pool() -> None:
+    """重置共享 facts 连接池（用于应对连接断开/SSL EOF 等瞬时错误）。"""
+    global _shared_facts_pg_pool
+    with _shared_facts_pg_pool_lock:
+        if _shared_facts_pg_pool is not None:
+            try:
+                _shared_facts_pg_pool.close()
+            finally:
+                _shared_facts_pg_pool = None
+
+
+def reset_shared_indicator_pg_pool() -> None:
+    """重置共享 derived 连接池（用于应对连接断开/SSL EOF 等瞬时错误）。"""
+    global _shared_derived_pg_pool
+    with _shared_derived_pg_pool_lock:
+        if _shared_derived_pg_pool is not None:
+            try:
+                _shared_derived_pg_pool.close()
+            finally:
+                _shared_derived_pg_pool = None
+
+
+@contextmanager
+def shared_pg_conn():
+    """共享 facts 连接上下文"""
+    with get_shared_pg_pool().connection() as conn:
+        yield conn
+
+
+@contextmanager
+def shared_indicator_pg_conn():
+    """共享 derived 连接上下文"""
+    with get_shared_indicator_pg_pool().connection() as conn:
+        yield conn
+
+
+class DataReader:
+    """从 TimescaleDB 读取 K 线数据（高性能版）"""
+
+    def __init__(self, db_url: str = None, pool_size: int = 10):
+        self.db_url = db_url or config.db_url
+        self._pool = None
+        self._pool_size = pool_size
+        self._pool_lock = threading.Lock()
+
+    @property
+    def pool(self):
+        """懒加载连接池（线程安全）"""
+        if self._pool is None:
+            with self._pool_lock:
+                if self._pool is None:
+                    self._pool = ConnectionPool(
+                        self.db_url,
+                        min_size=2,
+                        max_size=self._pool_size,
+                        kwargs={"row_factory": dict_row},
+                        timeout=120,
+                    )
+        return self._pool
+
+    @contextmanager
+    def _conn(self):
+        """从连接池获取连接"""
+        with self.pool.connection() as conn:
+            yield conn
+
+    def _execute_pg(self, conn, sql: str, params=None):
+        """执行 PG 查询并计数"""
+        inc_pg_query()
+        return conn.execute(sql, params) if params is not None else conn.execute(sql)
+
+    def get_klines(self, symbols: Sequence[str], interval: str, limit: int = 300, exchange: str = None) -> Dict[str, pd.DataFrame]:
+        """批量获取 K 线数据 - 并行查询"""
+        exchange = exchange or config.exchange
+        if not symbols:
+            return {}
+
+        table = _candles_table(interval)
+        symbols_list = list(symbols)
+
+        # 根据周期计算时间范围，避免扫描全部分区
+        interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
+        minutes = interval_minutes.get(interval, 5) * limit * 2
+
+        # 对于大量币种，使用并行单币种查询更快
+        if len(symbols_list) > 50:
+            return self._get_klines_parallel(symbols_list, interval, limit, exchange)
+
+        # 小批量使用窗口函数
+        sql = f"""
+            WITH ranked AS (
+                SELECT symbol, bucket_ts, open, high, low, close, volume,
+                       quote_volume, trade_count, taker_buy_volume, taker_buy_quote_volume,
+                       ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY bucket_ts DESC) as rn
+                FROM {table}
+                WHERE symbol = ANY(%s) AND exchange = %s AND bucket_ts > NOW() - INTERVAL '{minutes} minutes'
+            )
+            SELECT symbol, bucket_ts, open, high, low, close, volume,
+                   quote_volume, trade_count, taker_buy_volume, taker_buy_quote_volume
+            FROM ranked WHERE rn <= %s
+            ORDER BY symbol, bucket_ts ASC
+        """
+
+        result = {}
+        try:
+            with self._conn() as conn:
+                rows = self._execute_pg(conn, sql, (symbols_list, exchange, limit)).fetchall()
+                if rows:
+                    from itertools import groupby
+                    for symbol, group in groupby(rows, key=lambda x: x['symbol']):
+                        row_list = list(group)
+                        if row_list:
+                            result[symbol] = self._rows_to_df(row_list)
+        except Exception as e:
+            LOG.warning(f"批量查询失败，回退并行查询: {e}")
+            result = self._get_klines_parallel(symbols_list, interval, limit, exchange)
+
+        return result
+
+    def _get_klines_parallel(self, symbols: Sequence[str], interval: str, limit: int, exchange: str) -> Dict[str, pd.DataFrame]:
+        """并行查询多币种"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        result = {}
+        table = _candles_table(interval)
+
+        # 根据周期计算时间范围，避免扫描全部分区
+        interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
+        minutes = interval_minutes.get(interval, 5) * limit * 2  # 2倍余量
+
+        def fetch_one(symbol: str):
+            try:
+                with self.pool.connection() as conn:
+                    sql = f"""
+                        SELECT bucket_ts, open, high, low, close, volume, 
+                               quote_volume, trade_count, taker_buy_volume, taker_buy_quote_volume
+                        FROM {table}
+                        WHERE symbol = %s AND exchange = %s AND bucket_ts > NOW() - INTERVAL '{minutes} minutes'
+                        ORDER BY bucket_ts DESC
+                        LIMIT %s
+                    """
+                    rows = self._execute_pg(conn, sql, (symbol, exchange, limit)).fetchall()
+                    if rows:
+                        return symbol, self._rows_to_df(list(reversed(rows)))
+            except Exception:
+                pass
+            return symbol, None
+
+        workers = min(self._pool_size - 1, 8)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(fetch_one, s) for s in symbols]
+            for future in as_completed(futures):
+                sym, df = future.result()
+                if df is not None:
+                    result[sym] = df
+
+        return result
+
+    def get_klines_multi_interval(self, symbols: Sequence[str], intervals: Sequence[str], limit: int = 300, exchange: str = None) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """多周期并行获取数据"""
+        exchange = exchange or config.exchange
+        if not symbols or not intervals:
+            return {}
+
+        result = {}
+
+        # 并行查询所有周期
+        workers = min(len(intervals), self._pool_size - 1, 7)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(self.get_klines, symbols, iv, limit, exchange): iv
+                for iv in intervals
+            }
+            for future in as_completed(futures):
+                iv = futures[future]
+                try:
+                    result[iv] = future.result()
+                except Exception as e:
+                    LOG.error(f"[{iv}] 查询失败: {e}")
+                    result[iv] = {}
+
+        return result
+
+    def _get_klines_fallback(self, symbols: Sequence[str], interval: str, limit: int, exchange: str) -> Dict[str, pd.DataFrame]:
+        """回退方案：逐个查询"""
+        result = {}
+        table = _candles_table(interval)
+
+        with self._conn() as conn:
+            for symbol in symbols:
+                sql = f"""
+                    SELECT bucket_ts, open, high, low, close, volume, 
+                           quote_volume, trade_count, taker_buy_volume, taker_buy_quote_volume
+                    FROM {table}
+                    WHERE symbol = %s AND exchange = %s
+                    ORDER BY bucket_ts DESC
+                    LIMIT %s
+                """
+                try:
+                    rows = self._execute_pg(conn, sql, (symbol, exchange, limit)).fetchall()
+                except Exception:
+                    continue
+
+                if rows:
+                    result[symbol] = self._rows_to_df(list(reversed(rows)))
+
+        return result
+
+    def _rows_to_df(self, rows: list) -> pd.DataFrame:
+        """将行数据转换为 DataFrame"""
+        df = pd.DataFrame([dict(r) for r in rows])
+        if "symbol" in df.columns:
+            df.drop(columns=["symbol"], inplace=True)
+        df.set_index(pd.DatetimeIndex(df["bucket_ts"], tz="UTC"), inplace=True)
+        df.drop(columns=["bucket_ts"], inplace=True)
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+
+    def get_symbols(self, exchange: str = None, interval: str = "1m") -> List[str]:
+        """获取交易所所有交易对"""
+        exchange = exchange or config.exchange
+        with self._conn() as conn:
+            sql = f"SELECT DISTINCT symbol FROM {_candles_table(interval)} WHERE exchange = %s"
+            return [r["symbol"] for r in self._execute_pg(conn, sql, (exchange,)).fetchall()]
+
+    def get_latest_ts(self, interval: str, exchange: str = None):
+        """获取某周期最新 K 线时间戳"""
+        exchange = exchange or config.exchange
+        try:
+            with self._conn() as conn:
+                sql = f"SELECT MAX(bucket_ts) FROM {_candles_table(interval)} WHERE exchange = %s"
+                row = self._execute_pg(conn, sql, (exchange,)).fetchone()
+                if row and row["max"]:
+                    return row["max"]
+        except Exception:
+            pass
+        return None
+
+    def close(self):
+        """关闭连接池"""
+        if self._pool:
+            self._pool.close()
+            self._pool = None
+
+
+# ==================== PG 写入（indicator_snapshots schema，对齐历史表结构） ====================
+
+class PgDataWriter:
+    """
+    将指标结果写入 PostgreSQL（indicator_snapshots schema）。
+
+    语义对齐历史 DataWriter：
+    - 对齐列：缺失补 NULL，多余丢弃
+    - 幂等：先删同一 (交易对, 周期, 数据时间) 再插入
+    - 保留窗口：按 (交易对, 周期) 保留每周期最新 N 条
+    """
+
+    def __init__(self, *, schema: str | None = None) -> None:
+        self.schema = (schema or config.indicator_pg_schema or "indicator_snapshots").strip() or "indicator_snapshots"
+        self._layout = (config.indicator_pg_layout or "legacy").strip().lower()
+        self._snapshots_table = (config.indicator_snapshots_table_name or "snapshots").strip() or "snapshots"
+        self._lock = threading.Lock()
+        self._cols_cache: dict[str, list[tuple[str, str]]] = {}
+        self._snapshots_table_checked: bool = False
+
+    def _load_table_columns(self, conn, table: str) -> list[tuple[str, str]]:
+        cached = self._cols_cache.get(table)
+        if cached is not None:
+            return cached
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = %s AND table_name = %s
+                ORDER BY ordinal_position
+                """,
+                (self.schema, table),
+            )
+            rows = cur.fetchall() or []
+
+        cols = [(str(r[0]), str(r[1])) for r in rows]
+        self._cols_cache[table] = cols
+        return cols
+
+    def _snapshots_enabled(self) -> bool:
+        return self._layout in {"dual", "snapshot"}
+
+    def _ensure_snapshots_table(self, conn) -> None:
+        if self._snapshots_table_checked or not self._snapshots_enabled():
+            return
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema=%s AND table_name=%s
+                """,
+                (self.schema, self._snapshots_table),
+            )
+            ok = cur.fetchone() is not None
+        if not ok:
+            raise RuntimeError(
+                f"PG 指标 snapshots 表不存在或不可见: {self.schema}.{self._snapshots_table}（请先执行 assets/database/db/schema/026_indicator_snapshots_snapshots.sql）"
+            )
+        self._snapshots_table_checked = True
+
+    def write(self, table: str, df: pd.DataFrame) -> None:
+        approx_rows = int(len(df)) if df is not None else 0
+        snapshots_enabled = self._snapshots_enabled()
+        meta_base = {
+            "layout": self._layout,
+            "schema": self.schema,
+            "tables_count": 1,
+            "approx_rows": approx_rows,
+            "indicator": str(table or "").strip(),
+        }
+
+        with self._lock:
+            for attempt in (1, 2):
+                with shared_indicator_pg_conn() as conn:
+                    try:
+                        with conn.cursor() as cur:
+                            try:
+                                self._write_table(conn, cur, table, df)
+                            except (OperationalError, InterfaceError):
+                                raise
+                            except Exception as exc:
+                                raise RuntimeError(f"写入指标表失败: {self.schema}.{table}") from exc
+                        conn.commit()
+
+                        if approx_rows > 0:
+                            _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_LEGACY, status="success", meta=meta_base)
+                            if snapshots_enabled:
+                                _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_SNAPSHOTS, status="success", meta=meta_base)
+                        return
+                    except (OperationalError, InterfaceError) as exc:
+                        # 连接断开/SSL EOF：回滚可能失败，忽略并重置连接池重试一次
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        if attempt == 1:
+                            reset_shared_indicator_pg_pool()
+                            continue
+                        if approx_rows > 0:
+                            meta = dict(meta_base)
+                            meta["error_text"] = f"{type(exc).__name__}: {exc}"
+                            _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_LEGACY, status="failed", meta=meta)
+                            if snapshots_enabled:
+                                _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_SNAPSHOTS, status="failed", meta=meta)
+                        raise
+                    except Exception as exc:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        if approx_rows > 0:
+                            meta = dict(meta_base)
+                            meta["error_text"] = f"{type(exc).__name__}: {exc}"
+                            _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_LEGACY, status="failed", meta=meta)
+                            if snapshots_enabled:
+                                _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_SNAPSHOTS, status="failed", meta=meta)
+                        raise
+
+    def write_batch(self, data: Dict[str, pd.DataFrame]) -> None:
+        if not data:
+            return
+
+        approx_rows = 0
+        for _table, _df in data.items():
+            if _df is None or _df.empty:
+                continue
+            approx_rows += int(len(_df))
+
+        snapshots_enabled = self._snapshots_enabled()
+        meta_base = {
+            "layout": self._layout,
+            "schema": self.schema,
+            "tables_count": int(len(data)),
+            "approx_rows": int(approx_rows),
+        }
+
+        with self._lock:
+            for attempt in (1, 2):
+                with shared_indicator_pg_conn() as conn:
+                    try:
+                        with conn.cursor() as cur:
+                            for table, df in data.items():
+                                try:
+                                    self._write_table(conn, cur, table, df)
+                                except (OperationalError, InterfaceError):
+                                    raise
+                                except Exception as exc:
+                                    raise RuntimeError(f"写入指标表失败: {self.schema}.{table}") from exc
+                        conn.commit()
+
+                        if approx_rows > 0:
+                            _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_LEGACY, status="success", meta=meta_base)
+                            if snapshots_enabled:
+                                _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_SNAPSHOTS, status="success", meta=meta_base)
+                        return
+                    except (OperationalError, InterfaceError) as exc:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        if attempt == 1:
+                            reset_shared_indicator_pg_pool()
+                            continue
+                        if approx_rows > 0:
+                            meta = dict(meta_base)
+                            meta["error_text"] = f"{type(exc).__name__}: {exc}"
+                            _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_LEGACY, status="failed", meta=meta)
+                            if snapshots_enabled:
+                                _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_SNAPSHOTS, status="failed", meta=meta)
+                        raise
+                    except Exception as exc:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        if approx_rows > 0:
+                            meta = dict(meta_base)
+                            meta["error_text"] = f"{type(exc).__name__}: {exc}"
+                            _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_LEGACY, status="failed", meta=meta)
+                            if snapshots_enabled:
+                                _emit_lineage_safe(resource_id=LINEAGE_RESOURCE_SNAPSHOTS, status="failed", meta=meta)
+                        raise
+
+
+    def _write_table(self, conn, cur, table: str, df: pd.DataFrame) -> None:
+        if df is None or df.empty:
+            return
+
+        cols_meta = self._load_table_columns(conn, table)
+        if not cols_meta:
+            raise RuntimeError(
+                f"PG 指标表不存在或不可见: {self.schema}.{table}（请先执行 assets/database/db/schema/021_indicator_snapshots_sqlite_parity.sql）"
+            )
+
+        pg_cols = [c for c, _t in cols_meta]
+        df_cols = list(df.columns)
+
+        # 对齐列：缺失补 None，多余丢弃
+        missing = [c for c in pg_cols if c not in df_cols]
+        for c in missing:
+            df[c] = None
+        df = df[pg_cols]
+
+        # NaN -> None（避免 PG 插入 NaN 造成后续聚合/排序异常）
+        df = df.where(pd.notnull(df), None)
+
+        # ==================== 三键防线（避免无键脏数据写入） ====================
+        #
+        # 历史上曾出现某些指标未输出 (交易对/周期/数据时间) 导致写入 NULL 或 "nan"，
+        # 这类行会绕过幂等删除与保留窗口清理，最终让表无限膨胀并破坏消费端筛选。
+        #
+        # 规则：只要表结构包含三键，则写入前强制丢弃任何三键缺失/空白/NaN 的行。
+        bad_tokens = {"", "-", "nan", "nat", "none", "null"}
+        if {"交易对", "周期", "数据时间"}.issubset(set(pg_cols)):
+            def _ok_key(series: pd.Series) -> pd.Series:
+                s = series.astype(str).str.strip()
+                return (~series.isna()) & (~s.str.lower().isin(bad_tokens)) & (s != "None") & (s != "")
+
+            mask = _ok_key(df["交易对"]) & _ok_key(df["周期"]) & _ok_key(df["数据时间"])
+            if not mask.all():
+                df = df[mask]
+            if df.empty:
+                return
+
+        # 幂等删除：同一 (交易对, 周期, 数据时间) 先删再插
+        if {"交易对", "周期", "数据时间"}.issubset(set(pg_cols)):
+            keys = df[["交易对", "周期", "数据时间"]].drop_duplicates()
+            # 过滤空 key，避免误删
+            keys = keys[(keys["交易对"].notna()) & (keys["周期"].notna()) & (keys["数据时间"].notna())]
+            if not keys.empty:
+                delete_sql = sql.SQL(
+                    'DELETE FROM {} WHERE "交易对"=%s AND "周期"=%s AND "数据时间"=%s'
+                ).format(sql.Identifier(self.schema, table))
+                cur.executemany(delete_sql, list(keys.itertuples(index=False, name=None)))
+                inc_pg_write()
+
+        # 插入
+        #
+        # ⚠️ 重要：psycopg 的占位符语法使用 `%s`，因此 SQL 文本中的任意 `%` 都会被解析器扫描。
+        # 我们的历史表结构中存在列名包含 `%`（例如 "距离趋势线%" / "持仓变动%"），且这些列名需要出现在 INSERT 列表里；
+        # 若不做转义，驱动会把 `%"` 误判为非法占位符并抛出：
+        #   ProgrammingError: only '%s', '%b', '%t' are allowed as placeholders, got '%"'
+        #
+        # 解决：将 Identifier 渲染为字符串后把 `%` 变为 `%%`（仅用于驱动解析阶段的“字面量%”转义），
+        # 最终发送到 PG 的 SQL 仍会是单个 `%`，不会改变真实列名。
+        def _ident_sql(*parts: str) -> sql.SQL:
+            rendered = sql.Identifier(*parts).as_string(conn)
+            if "%" in rendered:
+                rendered = rendered.replace("%", "%%")
+            return sql.SQL(rendered)
+
+        placeholders = sql.SQL(",").join(sql.Placeholder() for _ in pg_cols)
+        insert_sql = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+            _ident_sql(self.schema, table),
+            sql.SQL(",").join(_ident_sql(c) for c in pg_cols),
+            placeholders,
+        )
+
+        rows: list[tuple] = []
+        snapshot_rows: list[tuple[str, str, str, str, str]] = []
+        for tup in df.itertuples(index=False, name=None):
+            out: list[object] = []
+            for (_col, typ), val in zip(cols_meta, tup):
+                # 兜底：某些路径仍可能产生 float NaN（PG double 支持 NaN，但我们不希望写入 NaN，更不希望 text 列出现 "nan"）
+                if isinstance(val, float) and math.isnan(val):
+                    out.append(None)
+                    continue
+                if val is None:
+                    out.append(None)
+                    continue
+                if typ == "integer":
+                    try:
+                        out.append(int(val))
+                    except Exception:
+                        out.append(None)
+                    continue
+                if typ == "double precision":
+                    try:
+                        f = float(val)
+                        out.append(None if math.isnan(f) else f)
+                    except Exception:
+                        out.append(None)
+                    continue
+                # text
+                try:
+                    out.append(str(val))
+                except Exception:
+                    out.append(None)
+            rows.append(tuple(out))
+
+            if self._snapshots_enabled():
+                try:
+                    payload = {c: v for c, v in zip(pg_cols, out)}
+                    symbol = str(payload.get("交易对") or "").strip()
+                    period = str(payload.get("周期") or "").strip()
+                    data_time = str(payload.get("数据时间") or "").strip()
+                    if symbol and period and data_time:
+                        snapshot_rows.append(
+                            (
+                                table,
+                                symbol,
+                                period,
+                                data_time,
+                                json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str),
+                            )
+                        )
+                except Exception:
+                    # snapshot 写入是治理期增强项：不应影响 legacy 表写入主路径
+                    pass
+
+        if rows:
+            cur.executemany(insert_sql, rows)
+            inc_pg_write()
+
+        # 保留窗口清理
+        self._cleanup_old_data(cur, table, df)
+
+        # snapshots 双写（治理期增强）
+        if snapshot_rows:
+            self._ensure_snapshots_table(conn)
+            self._write_snapshots_rows(cur, snapshot_rows)
+            self._cleanup_snapshots_old_data(cur, indicator=table, df=df)
+
+    def _cleanup_old_data(self, cur, table: str, df: pd.DataFrame) -> None:
+        RETENTION = {
+            "1m": 120,   # 2小时
+            "5m": 120,   # 10小时
+            "15m": 96,   # 24小时
+            "1h": 144,   # 6天
+            "4h": 120,   # 20天，满足长窗口计算
+            "1d": 180,   # 6个月
+            "1w": 104,   # 2年
+        }
+
+        if df is None or df.empty:
+            return
+        if not {"交易对", "周期", "数据时间"}.issubset(set(df.columns)):
+            return
+
+        keys = df[["交易对", "周期"]].drop_duplicates()
+        if keys.empty:
+            return
+
+        by_interval: dict[str, list[str]] = {}
+        for symbol, interval in keys.itertuples(index=False, name=None):
+            sym = str(symbol).strip() if symbol is not None else ""
+            iv = str(interval).strip() if interval is not None else ""
+            if not sym or not iv:
+                continue
+            by_interval.setdefault(iv, []).append(sym)
+
+        if not by_interval:
+            return
+
+        cleanup_sql = sql.SQL(
+            """
+            WITH ranked AS (
+                SELECT ctid,
+                       row_number() OVER (PARTITION BY {sym_col} ORDER BY {ts_col} DESC) AS rn
+                FROM {tbl}
+                WHERE {period_col} = %s AND {sym_col} = ANY(%s)
+            )
+            DELETE FROM {tbl} t
+            USING ranked r
+            WHERE t.ctid = r.ctid AND r.rn > %s
+            """
+        ).format(
+            tbl=sql.Identifier(self.schema, table),
+            sym_col=sql.Identifier("交易对"),
+            period_col=sql.Identifier("周期"),
+            ts_col=sql.Identifier("数据时间"),
+        )
+
+        for iv, symbols in by_interval.items():
+            limit = int(RETENTION.get(iv, 60))
+            uniq = sorted({s for s in symbols if s})
+            if not uniq:
+                continue
+            cur.execute(cleanup_sql, (iv, uniq, limit))
+            inc_pg_write()
+
+    def _write_snapshots_rows(self, cur, rows: list[tuple[str, str, str, str, str]]) -> None:
+        insert_sql = sql.SQL(
+            """
+            INSERT INTO {tbl} (indicator, symbol, period, data_time, payload)
+            VALUES (%s, %s, %s, %s, %s::jsonb)
+            ON CONFLICT (indicator, symbol, period, data_time)
+            DO UPDATE SET payload=EXCLUDED.payload, collected_at=now()
+            """
+        ).format(tbl=sql.Identifier(self.schema, self._snapshots_table))
+        cur.executemany(insert_sql, rows)
+        inc_pg_write()
+
+    def _cleanup_snapshots_old_data(self, cur, *, indicator: str, df: pd.DataFrame) -> None:
+        RETENTION = {
+            "1m": 120,   # 2小时
+            "5m": 120,   # 10小时
+            "15m": 96,   # 24小时
+            "1h": 144,   # 6天
+            "4h": 120,   # 20天，满足长窗口计算
+            "1d": 180,   # 6个月
+            "1w": 104,   # 2年
+        }
+
+        if df is None or df.empty:
+            return
+        if not {"交易对", "周期"}.issubset(set(df.columns)):
+            return
+
+        keys = df[["交易对", "周期"]].drop_duplicates()
+        if keys.empty:
+            return
+
+        by_interval: dict[str, list[str]] = {}
+        for symbol, interval in keys.itertuples(index=False, name=None):
+            sym = str(symbol).strip() if symbol is not None else ""
+            iv = str(interval).strip() if interval is not None else ""
+            if not sym or not iv:
+                continue
+            by_interval.setdefault(iv, []).append(sym)
+
+        if not by_interval:
+            return
+
+        cleanup_sql = sql.SQL(
+            """
+            WITH ranked AS (
+                SELECT ctid,
+                       row_number() OVER (PARTITION BY symbol ORDER BY data_time DESC) AS rn
+                FROM {tbl}
+                WHERE indicator=%s AND period=%s AND symbol = ANY(%s)
+            )
+            DELETE FROM {tbl} t
+            USING ranked r
+            WHERE t.ctid = r.ctid AND r.rn > %s
+            """
+        ).format(
+            tbl=sql.Identifier(self.schema, self._snapshots_table),
+        )
+
+        for iv, symbols in by_interval.items():
+            limit = int(RETENTION.get(iv, 60))
+            uniq = sorted({s for s in symbols if s})
+            if not uniq:
+                continue
+            cur.execute(cleanup_sql, (indicator, iv, uniq, limit))
+            inc_pg_write()
+
+
+# 全局单例
+reader = DataReader()
+pg_writer = PgDataWriter()
+
+
+class WriterCompat:
+    """兼容旧调用：保留 interval 参数但不使用（PG 写入由 df 自带 周期 字段决定）。"""
+
+    def __init__(self, impl: PgDataWriter) -> None:
+        self._impl = impl
+
+    def write(self, table: str, df: pd.DataFrame, interval: str | None = None) -> None:  # noqa: ARG002
+        self._impl.write(table, df)
+
+    def write_batch(self, data: Dict[str, pd.DataFrame], interval: str | None = None) -> None:  # noqa: ARG002
+        self._impl.write_batch(data)
+
+
+writer = WriterCompat(pg_writer)

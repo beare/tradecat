@@ -1,0 +1,293 @@
+# ====================
+# 环境配置
+# ====================
+.env
+.env.*
+!.env.example
+1
+2
+3
+4
+5
+6
+AUDIT_REPORT.md
+CODE_LOCATIONS.md
+CODE_OF_CONDUCT.md
+!.github/CODE_OF_CONDUCT.md
+OPTIMIZATION_TODO.md
+MARKETING.md
+book/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+tmp_liuyao_repos_20260118/
+
+# ====================
+# Python
+# ====================
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+build/
+htmlcov/
+.coverage.*
+coverage.xml
+.venv/
+venv/
+*.png
+services/aws-service/
+
+# ====================
+# Node
+# ====================
+node_modules/
+
+# ====================
+# 运行时
+# ====================
+logs/
+pids/
+*.pid
+*.log
+cache/
+/artifacts/
+raw_materials/
+promptpack_*.json
+services/**/artifacts/
+core/**/artifacts/
+plugins/**/artifacts/
+assets/artifacts/cache/
+assets/artifacts/dist/
+assets/artifacts/coverage/
+assets/artifacts/i18n/
+**/output/
+*.cache
+*.db
+
+# ====================
+# IDE
+# ====================
+.idea/
+.vscode/
+*.swp
+**/.vs/
+**/Debug/
+**/Release/
+
+# ====================
+# 备份与导出
+# ====================
+backups/
+exports/
+data_export/
+api_exports/
+
+# 本地临时文件（不入库）
+core/query/api-service/tests/test_sqlite_indicators_backend.py
+*.zst
+*.dump
+.history/
+
+# ====================
+# 守护进程
+# ====================
+daemon.pid
+daemon.log
+run/
+
+# ====================
+# 本地历史
+# ====================
+.history/
+
+# ====================
+# 服务特定
+# ====================
+plugins/telegram/data/
+plugins/ai/data/
+plugins/*-main/
+libs/database/csv/downloads/
+libs/database/db/state/
+libs/database/telegram-cards/
+# assets/ 迁移后等价路径（保留 libs/ 规则用于兼容 symlink）
+assets/database/csv/downloads/
+assets/database/db/state/
+assets/database/telegram-cards/
+# libs/external/  # fate-service 外部库需要提交
+
+# ====================
+# 配置文件（含凭证）
+# ====================
+**/config.json
+!**/config.example.json
+**/ft_userdir/
+**/gcp/credentials/*.json
+**/.config/gcp/credentials/*.json
+**/.config/google/**/*.json
+**/*service-account*.json
+**/*sa-key*.json
+**/*.p12
+**/*.pem
+**/*.key
+**/*.crt
+**/*.cer
+**/*.der
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/*.kdbx
+
+# 敏感配置（绝对不提交）
+config/.env
+assets/config/.env
+
+# 保留模板
+!config/.env.example
+!assets/config/.env.example
+
+# SQLite 临时文件
+*.db-shm
+*.db-wal
+*.db-journal
+services/ai-service/data/
+services/compute/ai-service/data/
+services/markets-service/.venv
+services/ai-service/.venv
+services/data-service/.venv
+services/markets-service/.venv
+services/order-service/.venv
+services/telegram-service/.venv
+services/trading-service/.venv
+.venv-pypi/
+.coverage
+
+# Large external libraries / repos mirror (ignored; see assets/repo)
+libs/external/   # legacy path (pre-migration)
+assets/repo/
+assets/services-preview/
+# Nested copied repositories metadata must never enter the monorepo
+**/.git/
+dist/
+polymarket-bot.out
+
+
+# ====================
+# 备忘 / 待办（仅注释，不参与 ignore 规则）
+# ====================
+# 【AI / 前端】
+# - ai交易；codex resume 019be75d-562a-7b20-b6ad-ff65171ec762
+# - 币种查询，AI分析前端；codex resume 019be754-b4f2-7a23-98d6-a494cea5ae5f
+#
+# 【运维 / 部署】
+# - 整理/运维；codex resume 019be615-aa82-7002-a688-4094cec52d19
+# - 云部署前端；codex resume 019beca2-bfe8-7c41-b5c7-63e89bdb98c7
+# - 上云：把消费数据库计算好后推送到 AWS 数据库，前端部署到 AWS 提升响应速度
+# - 预测服务器；codex resume 019bf86c-fb15-7162-b1d2-5851c8358073
+# - 服务器部署；codex resume 019bf257-12b8-7d20-8c2d-90c82cacf895
+# - proxychains4 c
+#
+# 【数据库 / 性能】
+# - 数据库优化；codex resume 019be782-1aae-7020-adab-826c8ade30c6
+# - 数据库读写；codex resume 019be77b-9ece-7aa0-ab84-714faaa9f338
+# - 数据库导入；codex resume 019bf257-12b8-7d20-8c2d-90c82cacf895
+# - 性能审计；codex resume 019be77f-8345-7dd1-8e76-242686252b8b
+# - 性能；codex resume 019be61a-c9c1-7d30-8cba-37ac42a2e327
+# - 数据做 AI 输入的规范化构建，降低 token 成本开销
+#
+# 【交易 / 信号】
+# - 优化订单块的信号
+# - 信号整理：做强度过滤规则按钮
+#
+# 【Skill / 提示词 / API】
+# - 完善内部 API 调用链路，提升稳定性、可观测性与一致性（制作 skill，暴露给 AI 分析调用）
+# - 提示词加入 skill
+# - 把 datacat 里面的高价值数据查询加入到 skill
+# - 制作 task 制作的系统提示词（待办）
+# - 使用提示词审计 task：https://docs.google.com/spreadsheets/d/1Ifk_dLF25ULSxcfGem1hXzJsi7_RBUNAki8SBCuvkJA/edit?gid=1777853069#gid=1777853069&range=R73
+#
+# 【数据源 / 路径】
+# - tradecat\\libs\\database\\services\\signal-service\\signal_history.db
+# - tradecat\\libs\\database\\services\\telegram-service\\market_data.db
+# - datacat\\libs\\database\\unified.db
+# - datacat 内部（路径为本机环境变量/工作区决定）
+#
+# 【参考链接】
+# - https://x.com/immersivetran/status/2015978209209434389?s=20
+# - 可视化工具：https://github.com/owid
+# - https://x.com/CryptoPainter/status/2016786049897549907?s=20（逆向这个模型）
+#
+# 【采集链路：Binance UM Futures（实时 / 回填）】
+# - tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/realtime/push/ws/klines/cryptofeed.py
+#   - WS 实时 Kline（1m）采集与写库/JSON
+# - tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/realtime/pull/rest/metrics/http.py
+#   - REST 实时指标（5m）采集与写库/JSON
+# - tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/backfill/pull/rest/klines/ccxt.py
+#   - REST Kline 回填（支持 --interval，默认 1m）
+# - tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/backfill/pull/rest/metrics/http.py
+#   - REST 指标回填（5m）
+# - tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/backfill/pull/file/klines/http_zip.py
+#   - ZIP Kline 回填（支持 --interval，默认 1m）
+# - tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/backfill/pull/file/metrics/http_zip.py
+#   - ZIP 指标回填（5m）
+# - 其他：tradecat/services-preview/datacat-service/src/collectors/binance/um_futures/all/sync/pull/rest/alpha/http.py
+#   - Alpha/符号同步类逻辑
+#
+# 【杂项 / 待办】
+# - 修复 gemini 认证
+# - 检查提交信息：nofx 官方是什么时候加入测试网功能的
+# - 先加入守护脚本里的定时重启（临时止血）
+# - 重新设计数据采集结构，继续细分
+# - polymarket 数据集成
+# - LLM 调用：新增 https://aistudio.google key 的方法
+# - services-preview/nofx-dev
+# - data；codex resume 019bf884-1d06-79a0-92b2-861c4a799b38
+# - debug；codex resume 019bfb19-add1-7051-9f93-25161946811c
+# - codex resume 019bf0ce-6dd6-7373-a166-fc245eb6253c
+# - codex resume 019bfd0f-8b32-75d3-a19e-cdf05fa24e21
+# - bnb；codex resume 019c05f3-e80b-7032-90bf-5bf061f86cc7
+# - 复现；codex resume 019c0321-39df-7711-93a7-ce3ffa212f7d
+# - 新数据服务；codex resume 019c02ac-db25-77b1-a7be-4b7d6e1e650e
+# - nofx 编译；codex resume 019c03c9-9216-7310-82c4-8e5df2ddf9d7
+# - nofx；codex resume 019c0218-7945-7622-aa2c-cf69d64c0a15
+# - 运维；codex resume 019c0090-2198-7811-b0a8-b715edaf8092
+# - 信号有效性统计；codex resume 019c05c0-23f5-7d50-b773-b3d171f789c5
+# - api；codex resume 019c00c3-527e-7a83-afcb-95670b37bc33
+# - 玄学博士；codex resume 019c068c-1900-7f40-a2da-79a2cedf677e
+# - 主控；codex resume 019c0647-d0eb-7090-9fdd-94690c66f989
+# - unib；codex resume 019c064f-f8e1-7331-a775-be89c4a46b4f
+# - inf；codex resume 019c064f-f591-7b80-a5aa-0488d11a4200
+# - aeon；codex resume 019c064f-f558-76f0-9fd1-550b4bb5831b
+# - 宣发；codex resume 019c08b0-7a5f-7a52-ad0d-6c04f6a6c70b
+# - git；codex resume 019c088b-ada6-7870-969d-7524c23db9e0
+# - codex resume 019c0703-e493-7d71-a638-b97e6e62454f
+# - 展示：tgbot 直接用、视频展示、skill 使用展示
+# - 几个关键点：数据基建、可拓展的数据统计和处理方法
+# - task；codex resume 019c0c06-87e6-7f60-98f1-97b6a9618fe0
+# - 工程治理
+# - 龙虾 bot 部署；codex resume 019c0d96-9c0c-7c40-bb46-92b60ac955dc，codex resume 019c1318-7572-74e3-9378-c181a58fb36b
+
+数据服务；codex resume 019c02ac-db25-77b1-a7be-4b7d6e1e650e
+数据库优化；codex resume 019c1085-9562-7202-8c34-d6b2b29f9648，codex resume 019c1087-77d0-7793-9912-be24ff62b45d
+ccxt端点枚举；codex resume 019c10cb-aa05-7530-bb81-208367ecc6f6
+tasks；codex resume 019c10df-18bb-7e92-8e12-d331b2595f1b，codex resume 019c0c06-87e6-7f60-98f1-97b6a9618fe0
+
+核心任务
+
+task系统提示词
+
+龙虾bot接入系统使用，作为胶水使用自然语言调用方法
+
+新建数据库/新增采集服务，先只跑一个币种，实现全字段收集
+
+规划，
+
+REST，WS划分，单py实现全字段获取
+
+预测模型；codex resume 019c16a3-a88f-73e2-8c23-b7217e7d33a0
+019c6852-222e-7e90-98a4-7c1ca562094d
+
+# MkDocs build output
+site/

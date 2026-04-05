@@ -1,0 +1,724 @@
+schema_version: "1.0"
+catalog_id: "tradecat_contract_resources"
+
+# 注意：
+# - 本文件是中央契约源，不再使用 schema_env/table_env 间接表达 canonical physical mapping。
+# - 当前已承接 market/binance 主链与治理表、alternative 首批事实表、
+#   derived 指标/信号主表、Query API 资源与 lineage 兼容资源；
+#   legacy catalog 只保留 projection 兼容层。
+
+resources:
+  - resource_id: "facts/market/futures_um_candles_1m"
+    type: "dataset"
+    name_zh: "UM 1m K线对象"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_futures_um_candles_1m"
+
+  - resource_id: "facts/market/futures_um_metrics_snapshot_5m"
+    type: "dataset"
+    name_zh: "UM 5m 指标快照对象"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_futures_um_metrics_snapshot_5m"
+
+  - resource_id: "facts/market/futures_um_trades"
+    type: "dataset"
+    name_zh: "UM 逐笔成交原子事实"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query", "plugins/trading"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_futures_um_trades"
+
+  - resource_id: "facts/market/futures_um_book_ticker"
+    type: "dataset"
+    name_zh: "UM 最优买卖盘原子事实"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query", "plugins/trading"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_futures_um_book_ticker"
+
+  - resource_id: "facts/market/futures_um_book_depth"
+    type: "dataset"
+    name_zh: "UM 深度原子事实"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query", "plugins/trading"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_futures_um_book_depth"
+
+  - resource_id: "facts/market/spot_candles_1m"
+    type: "dataset"
+    name_zh: "Spot 1m K线对象"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query", "plugins/trading"]
+    status: "active"
+    physical:
+      kind: "postgres_view"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_cagg_spot_klines_1m"
+
+  - resource_id: "facts/market/spot_trades"
+    type: "dataset"
+    name_zh: "Spot 逐笔成交原子事实"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["plugins/trading"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_spot_trades"
+
+  - resource_id: "facts/market/shared_files"
+    type: "dataset"
+    name_zh: "文件索引与审计"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_files"
+
+  - resource_id: "facts/market/shared_file_revisions"
+    type: "dataset"
+    name_zh: "文件修订记录"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_file_revisions"
+
+  - resource_id: "facts/market/shared_import_batches"
+    type: "dataset"
+    name_zh: "导入批次"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_import_batches"
+
+  - resource_id: "facts/market/shared_import_errors"
+    type: "dataset"
+    name_zh: "导入错误"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_import_errors"
+
+  - resource_id: "facts/market/shared_venue"
+    type: "dataset"
+    name_zh: "交易所维表"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_venue"
+
+  - resource_id: "facts/market/shared_instrument"
+    type: "dataset"
+    name_zh: "标的维表"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_instrument"
+
+  - resource_id: "facts/market/shared_symbol_map"
+    type: "dataset"
+    name_zh: "symbol 到 instrument 映射"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "shared_symbol_map"
+
+  - resource_id: "facts/alternative/news"
+    type: "dataset"
+    name_zh: "新闻事件事实表（alternative.news）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/alternative/news"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "news"
+
+  - resource_id: "facts/alternative/telegram"
+    type: "dataset"
+    name_zh: "Telegram 消息事实表（alternative.telegram）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/alternative/telegram"]
+    consumers: ["core/query", "plugins/telegram"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "telegram"
+
+  - resource_id: "facts/alternative/x"
+    type: "dataset"
+    name_zh: "X 推文事实表（alternative.x）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/alternative/x/tg-unified"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "x"
+
+  - resource_id: "facts/alternative/investing_calendar_snapshots"
+    type: "dataset"
+    name_zh: "Investing 经济日历快照（alternative.investing_calendar_snapshots）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/alternative/investing"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "investing_calendar_snapshots"
+
+  - resource_id: "facts/alternative/hyperliquid_address_snapshots"
+    type: "dataset"
+    name_zh: "Hyperliquid 地址快照（alternative.hyperliquid_address_snapshots）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/alternative/hyperliquid"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "hyperliquid_address_snapshots"
+
+  - resource_id: "facts/governance/lineage_events"
+    type: "dataset"
+    name_zh: "血缘事件（facts；governance.lineage_events）"
+    layer: "facts"
+    domain: "governance"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/*"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "governance"
+      object_name: "lineage_events"
+
+  - resource_id: "facts/market/binance_ingest_runs"
+    type: "dataset"
+    name_zh: "Binance 导入运行记录"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_ingest_runs"
+
+  - resource_id: "facts/market/binance_ingest_watermark"
+    type: "dataset"
+    name_zh: "Binance 导入水位"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_ingest_watermark"
+
+  - resource_id: "facts/market/binance_ingest_gaps"
+    type: "dataset"
+    name_zh: "Binance 缺口治理"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_ingest_gaps"
+
+  - resource_id: "facts/market/binance_missing_intervals"
+    type: "dataset"
+    name_zh: "Binance 缺失时间窗"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_missing_intervals"
+
+  - resource_id: "facts/market/binance_ingest_offsets"
+    type: "dataset"
+    name_zh: "Binance 导入偏移"
+    layer: "facts"
+    domain: "market"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/market/binance"]
+    consumers: ["plugins/trading"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "market"
+      object_name: "binance_ingest_offsets"
+
+  - resource_id: "facts/alternative/discord"
+    type: "dataset"
+    name_zh: "Discord 消息事实表（alternative.discord）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "secret"
+    owners: ["tradecat"]
+    producers: ["core/alternative/discord"]
+    consumers: ["core/query", "plugins/telegram"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "discord"
+    evidence:
+      - "assets/docs/core/database-service-map.md"
+
+  - resource_id: "facts/alternative/unified_events_view"
+    type: "dataset"
+    name_zh: "统一事件视图（alternative.unified_events）"
+    layer: "facts"
+    domain: "alternative"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["db/derived-view"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_view"
+      database_ref: "facts"
+      schema: "alternative"
+      object_name: "unified_events"
+    evidence:
+      - "assets/database/db/schema/012_alternative_events.sql"
+
+  - resource_id: "derived/indicator_snapshots/snapshots"
+    type: "dataset"
+    name_zh: "指标快照（indicator_snapshots.snapshots，JSONB 单表主路径）"
+    layer: "derived"
+    domain: "indicators"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["plugins/trading"]
+    consumers: ["core/query", "plugins/telegram", "plugins/sheets"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "derived"
+      schema: "indicator_snapshots"
+      object_name: "snapshots"
+    evidence:
+      - "assets/docs/core/database-service-map.md"
+
+  - resource_id: "derived/indicator_snapshots/legacy_tables"
+    type: "dataset"
+    name_zh: "指标 legacy 多表（indicator_snapshots.<指标表名>；兼容/回滚路径）"
+    layer: "derived"
+    domain: "indicators"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["plugins/trading"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_schema"
+      database_ref: "derived"
+      schema: "indicator_snapshots"
+      note: "表名为动态集合（每个指标一张表，表名=indicator meta.name）；仅用于 legacy/rollback"
+    evidence:
+      - "assets/docs/core/current-database-truth.md"
+
+  - resource_id: "derived/signal_runtime/cooldown"
+    type: "dataset"
+    name_zh: "信号冷却状态（signal_runtime.cooldown）"
+    layer: "derived"
+    domain: "signals"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["plugins/signal"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "derived"
+      schema: "signal_runtime"
+      object_name: "cooldown"
+    evidence:
+      - "assets/docs/core/database-service-map.md"
+
+  - resource_id: "derived/signal_runtime/signal_history"
+    type: "dataset"
+    name_zh: "信号历史（signal_runtime.signal_history）"
+    layer: "derived"
+    domain: "signals"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["plugins/signal"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "derived"
+      schema: "signal_runtime"
+      object_name: "signal_history"
+    evidence:
+      - "assets/docs/core/database-service-map.md"
+
+  - resource_id: "derived/signal_runtime/signal_subs"
+    type: "dataset"
+    name_zh: "信号订阅（signal_runtime.signal_subs）"
+    layer: "derived"
+    domain: "signals"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["plugins/signal"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "derived"
+      schema: "signal_runtime"
+      object_name: "signal_subs"
+    evidence:
+      - "assets/docs/core/database-service-map.md"
+
+  - resource_id: "api/query/health"
+    type: "api"
+    name_zh: "Query Service 健康检查（含数据源探测）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["ops", "ci"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/health"
+    evidence:
+      - "assets/catalog/data_sources.v1.yaml"
+
+  - resource_id: "api/query/capabilities"
+    type: "api"
+    name_zh: "能力发现（cards/intervals/sources）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/telegram", "plugins/sheets", "plugins/llm-gateway"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/capabilities"
+    evidence:
+      - "assets/catalog/data_sources.v1.yaml"
+
+  - resource_id: "api/query/catalog_resources"
+    type: "api"
+    name_zh: "语义层资源目录（resources catalog）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["ops", "ci", "plugins/telegram", "plugins/sheets", "plugins/llm-gateway", "plugins/vis"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/catalog/resources"
+    evidence:
+      - "core/query/src/routers/catalog_v1.py"
+
+  - resource_id: "api/query/dashboard"
+    type: "api"
+    name_zh: "看板聚合（dashboard）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/sheets", "plugins/telegram", "plugins/llm-gateway"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/dashboard"
+    evidence:
+      - "assets/catalog/data_sources.v1.yaml"
+
+  - resource_id: "api/query/events"
+    type: "api"
+    name_zh: "事件流（events）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/telegram", "plugins/llm-gateway"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/events"
+    evidence:
+      - "assets/catalog/unified/01_catalog.md"
+
+  - resource_id: "api/query/calendar"
+    type: "api"
+    name_zh: "经济日历（calendar）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/telegram", "plugins/llm-gateway"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/calendar"
+    evidence:
+      - "assets/catalog/unified/01_catalog.md"
+
+  - resource_id: "api/query/positions"
+    type: "api"
+    name_zh: "持仓/地址行为（positions）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/llm-gateway"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/positions"
+    evidence:
+      - "assets/catalog/unified/01_catalog.md"
+
+  - resource_id: "api/query/ws"
+    type: "api"
+    name_zh: "事件 WS（/api/v1/ws）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/telegram"]
+    status: "active"
+    physical:
+      kind: "ws_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/ws"
+    evidence:
+      - "assets/catalog/unified/01_catalog.md"
+
+  - resource_id: "derived/governance/lineage_events"
+    type: "dataset"
+    name_zh: "血缘事件（derived；governance.lineage_events）"
+    layer: "derived"
+    domain: "governance"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["plugins/*"]
+    consumers: ["core/query"]
+    status: "active"
+    physical:
+      kind: "postgres_table"
+      database_ref: "derived"
+      schema: "governance"
+      object_name: "lineage_events"
+    evidence:
+      - "assets/database/db/schema/027_governance_lineage_events.sql"
+      - "assets/docs/core/resource-model.md"
+
+  - resource_id: "api/query/lineage_events"
+    type: "api"
+    name_zh: "血缘事件列表（/api/v1/lineage/events）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/*"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/lineage/events"
+    evidence:
+      - "assets/docs/core/resource-model.md"
+
+  - resource_id: "api/query/lineage_run"
+    type: "api"
+    name_zh: "血缘事件（按 run_id）（/api/v1/lineage/runs/{run_id}）"
+    layer: "system"
+    domain: "query"
+    sensitivity: "internal"
+    owners: ["tradecat"]
+    producers: ["core/query"]
+    consumers: ["plugins/*"]
+    status: "active"
+    physical:
+      kind: "http_endpoint"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/lineage/runs/{run_id}"
+    evidence:
+      - "assets/docs/core/resource-model.md"

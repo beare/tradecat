@@ -1,0 +1,192 @@
+site_name: TradeCat
+site_url: https://docs.tradecat.dev
+site_description: Quantitative Trading for Everyone
+site_author: TradeCat Team
+
+repo_url: https://github.com/tukuaiai/tradecat
+repo_name: tukuaiai/tradecat
+edit_uri: edit/main/assets/docs/
+
+docs_dir: assets/docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+  language: en
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Architecture:
+    - Repo Structure Overview: core/repo-structure-overview.md
+    - Current Database Truth: core/current-database-truth.md
+    - Database Service Map: core/database-service-map.md
+    - Binance Timescale Governance Runbook: core/binance-timescale-governance-runbook.md
+    - Data Service Architecture Standard: core/data-service-architecture-standard.md
+    - Data Service Scaffold Template: core/data-service-scaffold-template.md
+    - Dataset-First Service Template: core/dataset-first-data-service-template.md
+    - Resource Model: core/resource-model.md
+    - Constitution: architecture/CONSTITUTION.md
+    - Path Management: architecture/path-management.md
+    - Data Catalog: architecture/data-catalog.md
+    - Database Asset Classification: architecture/database-assets-classification.md
+    - Database Rollback Runbook: architecture/database-rollback-runbook.md
+    - Core Service Smoke Matrix: architecture/service-smoke-matrix.md
+    - Architecture Exceptions: architecture/architecture-exceptions.md
+    - Legacy Paths:
+      - Repo Structure Overview (Legacy): architecture/repo-structure-overview.md
+      - Current Database Truth (Legacy): architecture/current-database-truth.md
+      - Database Service Map (Legacy): architecture/database-service-map.md
+  - User Guide:
+    - Data: guide/data.md
+    - Data Sources (CN): data/数据源.md
+    - Indicators: guide/indicators.md
+    - Signals: guide/signals.md
+    - AI Analysis: guide/ai.md
+  - API Reference:
+    - Data: api/data.md
+    - Indicators: api/indicators.md
+    - Signals: api/signals.md
+    - AI: api/ai.md
+    - Config: api/config.md
+  - Examples:
+    - Basic Usage: examples/basic.md
+    - Multi-Symbol: examples/multi-symbol.md
+    - Custom Signals: examples/custom-signals.md
+  - Engineering:
+    - Docs Site: AGENTS.md
+    - Audits:
+      - 2026-03-30 Service Audit: core/audits/2026-03-30-service-audit/README.md
+      - Report: core/audits/2026-03-30-service-audit/REPORT.md
+      - Service Registry: core/audits/2026-03-30-service-audit/SERVICE_REGISTRY.md
+      - Exec Log: core/audits/2026-03-30-service-audit/EXEC_LOG.md
+    - Analysis:
+      - Index: analysis/INDEX.md
+      - Competition Report: analysis/COMPETITION_REPORT.md
+      - Deploy Prompt: analysis/DEPLOY_PROMPT.md
+      - Marketing Promo: analysis/MARKETING_PROMO.md
+      - Performance Audit Trading Service: analysis/PERFORMANCE_AUDIT_TRADING_SERVICE.md
+      - Architecture Analysis Report: analysis/architecture_analysis_report.md
+      - Architecture Refactoring Plan: analysis/architecture_refactoring_plan.md
+      - Binance Vision Dataset Schema: analysis/binance_vision_dataset_schema.md
+      - Binance Dataset Toggle PRD: analysis/binance_dataset_toggle_prd.md
+      - Binance Service Refactor PRD: analysis/binance_service_refactor_prd.md
+      - Binance Archive Object Change PRD: analysis/binance_archive_object_change_prd.md
+      - Binance Marketdata Production Hardening PRD: analysis/binance_marketdata_production_hardening_prd.md
+      - Semantic Contract Centralization PRD: analysis/semantic_contract_centralization_prd.md
+      - Binance Vision DB Physical Design: analysis/binance_vision_db_physical_design.md
+      - Binance Vision Field Dictionary: analysis/binance_vision_field_dictionary.md
+      - Binance Vision Futures UM Book Data Full Ingestion Plan: analysis/binance_vision_futures_um_book_data_full_ingestion_plan.md
+      - Binance Vision Futures UM Book Depth Curve Explained: analysis/binance_vision_futures_um_book_depth_curve_explained.md
+      - Binance Vision UM Trades Dev Retrospective: analysis/binance_vision_um_trades_dev_retrospective.md
+      - Binance Vision UM Trades Local Only Import: analysis/binance_vision_um_trades_local_only_import.md
+      - Binance Vision UM Trades Mature Playbook: analysis/binance_vision_um_trades_mature_playbook.md
+      - Binance Vision UM Trades Maturity Audit: analysis/binance_vision_um_trades_maturity_audit.md
+      - Binance Vision UM Trades Raw Design: analysis/binance_vision_um_trades_raw_design.md
+      - CCXT Documentation: analysis/ccxt-documentation.md
+      - Crypto Atomic Common Fields Contract: analysis/crypto_atomic_common_fields_contract.md
+      - Crypto Raw Trades Hardening Runbook: analysis/crypto_raw_trades_hardening_runbook.md
+      - Crypto Trades Fact Table Pro Design: analysis/crypto_trades_fact_table_pro_design.md
+      - Layer Contract One Pager: analysis/layer_contract_one_pager.md
+      - Module Health Analysis: analysis/module_health_analysis.md
+      - Multi Market DB Design: analysis/multi_market_db_design.md
+      - Query Service TDD: analysis/query-service-tdd.md
+      - Refactored Component Usage Guide: analysis/refactored_component_usage_guide.md
+      - Repair Plan: analysis/repair_plan.md
+      - Repo Structure Design Copy: "analysis/repo_structure_design copy.md"
+      - Repo Structure Design: analysis/repo_structure_design.md
+      - Sheets Dashboard Flicker Free Refresh Design: analysis/sheets_dashboard_flicker_free_refresh_design.md
+      - Sheets Dashboard Optimization Options: analysis/sheets_dashboard_optimization_options.md
+      - Sheets Dashboard Source Info Compaction Plan: analysis/sheets_dashboard_source_info_compaction_plan.md
+      - Sheets Dashboard Variant5 Optimization Runbook: analysis/sheets_dashboard_variant5_optimization_runbook.md
+      - Signal Correlation: analysis/signal_correlation.md
+      - SQLite to PG Indicator Storage TDD: analysis/sqlite_to_pg_indicator_storage_tdd.md
+      - System Architecture Flowchart: analysis/system_architecture_flowchart.md
+      - TG Cards Google Sheets Apps Script Webhook: analysis/tg_cards_google_sheets_apps_script_webhook.md
+      - TG Cards Google Sheets Dashboard PRD: analysis/tg_cards_google_sheets_dashboard_prd.md
+      - TG Cards PG Schema SQLite Parity Plan: analysis/tg_cards_pg_schema_sqlite_parity_plan.md
+      - Tradecat Complete Flowchart: analysis/tradecat_complete_flowchart.md
+      - Tradecat Mega Flowchart: analysis/tradecat_mega_flowchart.md
+      - Binance API Complete Doc Summary (CN): analysis/币安API完整文档汇总.md
+      - Binance All APIs (CN): analysis/币安全部api.md
+      - Quant Assets (CN): analysis/量化相关资产.md
+      - HFT Knowledge Structure (CN): analysis/高频交易知识结构文档.md
+    - ADR: decisions/adr/README.md
+    - Prompts: prompts/README.md
+    - L1:
+      - Index: L1/index.md
+      - AGENTS: L1/AGENTS.md
+      - TODO: L1/TODO.md
+      - Changelog: L1/changelog.md
+      - Changelog Legacy: L1/changelog_legacy.md
+      - Strategy (CN): L1/战略.md
+      - Architecture (CN): L1/架构.md
+      - Plan (CN): L1/规划.md
+      - Milestones (CN): L1/里程碑.md
+      - Requirements (CN): L1/需求.md
+  - Changelog: analysis/CHANGELOG.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tukuaiai/tradecat
+    - icon: fontawesome/brands/telegram
+      link: https://t.me/tradecat_ai_channel
+    - icon: fontawesome/brands/twitter
+      link: https://x.com/123olp
+
+copyright: Copyright &copy; 2024 TradeCat Team

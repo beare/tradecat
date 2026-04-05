@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint with ruff
+        run: |
+          args=(
+            core/
+            plugins/
+            --ignore E501,E402
+            --select E,F
+            --force-exclude
+            --extend-exclude '**/libs/external/**'
+            --extend-exclude '**/assets/external/**'
+            --extend-exclude '**/assets/repo/**'
+            --extend-exclude '**/assets/skills/**'
+          )
+          ruff check "${args[@]}"
+
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Syntax check
+        run: |
+          targets=(
+            core/query/src
+            core/market/binance/src
+            plugins/telegram/src
+            plugins/ai/src
+            plugins/trading/src
+            plugins/signal/src
+          )
+          python -m compileall -q "${targets[@]}"
+
+  query-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Query Service deps
+        working-directory: core/query
+        run: pip install -r requirements-dev.txt
+
+      - name: Run Query Service tests
+        working-directory: core/query
+        run: pytest tests/ -q
+
+  binance-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Binance Stack deps
+        working-directory: core/market/binance
+        run: make install-dev
+
+      - name: Run Binance Stack tests
+        working-directory: core/market/binance
+        run: make test
+
+      - name: Run Binance Stack doctor
+        working-directory: core/market/binance
+        run: PYTHONPATH=src:../../.. .venv/bin/python -m binance.service_entry doctor
+
+  repo-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install verify deps
+        run: pip install ruff pyyaml
+
+      - name: Run repository verify
+        run: ./scripts/verify.sh
+
+  semantic-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install catalog deps
+        run: pip install pyyaml
+
+      - name: Verify resources catalog
+        run: python scripts/verify_resources_catalog.py assets/catalog/resources.v1.yaml assets/catalog/data_sources.v1.yaml --check-consistency --min-resources 30 --require facts/market/candles_1m --require derived/indicator_snapshots/snapshots --require api/query/health --require api/query/capabilities --require api/query/catalog_resources
+
+      - name: Guard lineage resource_id usage
+        run: python scripts/guard_lineage_resource_ids.py

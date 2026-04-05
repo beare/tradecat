@@ -1,0 +1,7 @@
+# Binance 单工程根本地运行产物
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+var/
+__pycache__/

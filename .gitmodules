@@ -1,0 +1,3 @@
+[submodule "plugins/TradingAgents-main"]
+	path = plugins/TradingAgents-main
+	url = https://github.com/TauricResearch/TradingAgents

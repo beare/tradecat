@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# telegram-service 启动脚本
+# 用法: ./scripts/start.sh {start|stop|status|restart}
+
+set -uo pipefail
+
+# ==================== 配置区 ====================
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVICE_DIR="$(dirname "$SCRIPT_DIR")"
+
+find_project_root() {
+    local current="$1"
+    for _ in {1..12}; do
+        if [[ -f "$current/assets/config/.env.example" ]] && { [[ -d "$current/core" ]] || [[ -d "$current/plugins" ]]; }; then
+            echo "$current"
+            return 0
+        fi
+        if [[ -f "$current/config/.env.example" ]] && { [[ -d "$current/core" ]] || [[ -d "$current/plugins" ]]; }; then
+            echo "$current"
+            return 0
+        fi
+        local parent
+        parent="$(dirname "$current")"
+        [[ "$parent" == "$current" ]] && break
+        current="$parent"
+    done
+    (cd "$SERVICE_DIR/../../.." && pwd)
+}
+
+resolve_env_file() {
+    local root="$1"
+    local candidates=(
+        "$root/assets/config/.env"
+        "$root/config/.env"
+    )
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [[ -f "$candidate" ]]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    echo "${candidates[0]}"
+}
+
+PROJECT_ROOT="$(find_project_root "$SERVICE_DIR")"
+RUN_DIR="$SERVICE_DIR/pids"
+LOG_DIR="$SERVICE_DIR/logs"
+DAEMON_LOG="$LOG_DIR/daemon.log"
+BOT_PID="$RUN_DIR/bot.pid"
+BOT_LOG="$LOG_DIR/bot.log"
+STOP_TIMEOUT=10
+VENV_DIR="$SERVICE_DIR/.venv"
+
+# 安全加载 .env（只读键值解析，拒绝危险行）
+safe_load_env() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    
+    # 检查权限（生产环境强制 600）
+    if [[ ( "$file" == *"assets/config/.env" ) || ( "$file" == *"config/.env" ) ]] && [[ ! "$file" == *".example" ]]; then
+        local perm=$(stat -c %a "$file" 2>/dev/null)
+        if [[ "$perm" != "600" && "$perm" != "400" ]]; then
+            if [[ "${CODESPACES:-}" == "true" ]]; then
+                echo "⚠️  Codespace 环境，跳过权限检查 ($file: $perm)"
+            else
+                echo "❌ 错误: $file 权限为 $perm，必须设为 600"
+                echo "   执行: chmod 600 $file"
+                exit 1
+            fi
+        fi
+    fi
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*export ]] && continue
+        [[ "$line" =~ \$\( ]] && continue
+        [[ "$line" =~ \` ]] && continue
+        if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            local key="${BASH_REMATCH[1]}"
+            local val="${BASH_REMATCH[2]}"
+            val="${val#\"}" && val="${val%\"}"
+            val="${val#\'}" && val="${val%\'}"
+            export "$key=$val"
+        fi
+    done < "$file"
+}
+
+# 加载全局配置 → 服务配置
+ENV_FILE="$(resolve_env_file "$PROJECT_ROOT")"
+safe_load_env "$ENV_FILE"
+
+ensure_venv() {
+    if [[ -d "$VENV_DIR" ]]; then
+        return 0
+    fi
+    echo "创建虚拟环境..."
+    python3 -m venv "$VENV_DIR"
+    "$VENV_DIR/bin/pip" install -q --upgrade pip
+    if [[ -f "$SERVICE_DIR/requirements.txt" ]]; then
+        "$VENV_DIR/bin/pip" install -q -r "$SERVICE_DIR/requirements.txt"
+    fi
+}
+# 配置已统一到 assets/config/.env
+if [ -z "${BINANCE_PING_URL:-}" ]; then
+    if [ -n "${BINANCE_REST_BASE_MAINNET:-}" ]; then
+        BINANCE_PING_URL="${BINANCE_REST_BASE_MAINNET%/}/api/v3/ping"
+    elif [ -n "${BINANCE_FAPI_BASE:-}" ]; then
+        BINANCE_PING_URL="${BINANCE_FAPI_BASE%/}/fapi/v1/ping"
+    fi
+fi
+
+# 代理自检（重试3次+指数退避冷却）
+check_proxy() {
+    local proxy="${HTTP_PROXY:-${HTTPS_PROXY:-}}"
+    [ -z "$proxy" ] && return 0
+    
+    local retries=3
+    local delay=1
+    local i=0
+    local ping_url="${BINANCE_PING_URL:-}"
+    [ -z "$ping_url" ] && return 0
+    
+    while [ $i -lt $retries ]; do
+        if curl -s --max-time 3 --proxy "$proxy" "$ping_url" >/dev/null 2>&1; then
+            echo "✓ 代理可用: $proxy"
+            return 0
+        fi
+        ((i++))
+        if [ $i -lt $retries ]; then
+            echo "  代理检测失败，${delay}秒后重试 ($i/$retries)..."
+            sleep $delay
+            delay=$((delay * 2))
+        fi
+    done
+    
+    echo "⚠️  代理不可用（重试${retries}次失败），已禁用: $proxy"
+    unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+}
+
+# ==================== Query Service 预检（fail-fast，防“假运行”） ====================
+preflight_query_service() {
+    local base="${QUERY_SERVICE_BASE_URL:-}"
+    if [ -z "$base" ]; then
+        echo "❌ 错误: QUERY_SERVICE_BASE_URL 未配置"
+        echo "   请编辑: $PROJECT_ROOT/assets/config/.env"
+        exit 1
+    fi
+    base="${base%/}"
+
+    local mode="${QUERY_SERVICE_AUTH_MODE:-required}"
+    mode="$(echo "$mode" | tr '[:upper:]' '[:lower:]' | xargs)"
+    [ -z "$mode" ] && mode="required"
+
+    local url="$base/api/v1/health"
+    local resp=""
+    if [ "$mode" = "disabled" ] || [ "$mode" = "off" ]; then
+        echo "⚠️  QUERY_SERVICE_AUTH_MODE=$mode（已关闭鉴权，仅限本地/受控环境）"
+        resp="$(curl -s --max-time 2 "$url" || true)"
+    else
+        if [ -z "${QUERY_SERVICE_TOKEN:-}" ] || [ "${QUERY_SERVICE_TOKEN:-}" = "dev-token-change-me" ] || [ "${QUERY_SERVICE_TOKEN:-}" = "your_token_here" ]; then
+            echo "❌ 错误: QUERY_SERVICE_TOKEN 未配置或为默认占位值"
+            echo "   请编辑: $PROJECT_ROOT/assets/config/.env"
+            echo "   并重启 Query Service: cd core/query && ./scripts/start.sh restart"
+            exit 1
+        fi
+        resp="$(curl -s --max-time 2 -H "X-Internal-Token: $QUERY_SERVICE_TOKEN" "$url" || true)"
+    fi
+
+    if echo "$resp" | grep -q '\"success\":true'; then
+        echo "✓ Query Service 就绪: $base"
+        return 0
+    fi
+
+    echo "❌ Query Service 不可用或鉴权失败: $base"
+    echo "   建议："
+    echo "   1) 确认 assets/config/.env 的 QUERY_SERVICE_*"
+    echo "   2) 重启 Query Service: cd core/query && ./scripts/start.sh restart"
+    echo "   3) 再重启本服务"
+    exit 1
+}
+
+# ==================== 工具函数 ====================
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$DAEMON_LOG"
+}
+
+init_dirs() {
+    mkdir -p "$RUN_DIR" "$LOG_DIR"
+}
+
+is_running() {
+    local pid=$1
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+get_bot_pid() {
+    [ -f "$BOT_PID" ] && cat "$BOT_PID"
+}
+
+# ==================== Bot 管理 ====================
+start_bot() {
+    init_dirs
+    ensure_venv
+    local pid=$(get_bot_pid)
+    if is_running "$pid"; then
+        echo "✓ Bot 已运行 (PID: $pid)"
+        return 0
+    fi
+    
+    cd "$SERVICE_DIR/src"
+    # 用 setsid 彻底与当前会话脱钩，避免被调用方会话回收误杀（CI/非交互环境常见）
+    setsid "$VENV_DIR/bin/python" -u main.py >> "$BOT_LOG" 2>&1 < /dev/null &
+    local new_pid=$!
+    echo "$new_pid" > "$BOT_PID"
+    
+    sleep 2
+    if is_running "$new_pid"; then
+        log "START Bot (PID: $new_pid)"
+        echo "✓ Bot 已启动 (PID: $new_pid)"
+        return 0
+    else
+        log "ERROR Bot 启动失败"
+        echo "✗ Bot 启动失败"
+        return 1
+    fi
+}
+
+stop_bot() {
+    local pid=$(get_bot_pid)
+    if ! is_running "$pid"; then
+        echo "Bot 未运行"
+        rm -f "$BOT_PID"
+        return 0
+    fi
+    
+    kill "$pid" 2>/dev/null
+    local waited=0
+    while is_running "$pid" && [ $waited -lt $STOP_TIMEOUT ]; do
+        sleep 1
+        ((waited++))
+    done
+    
+    if is_running "$pid"; then
+        kill -9 "$pid" 2>/dev/null
+        log "KILL Bot (PID: $pid) 强制终止"
+    else
+        log "STOP Bot (PID: $pid)"
+    fi
+    
+    rm -f "$BOT_PID"
+    echo "✓ Bot 已停止"
+}
+
+status_bot() {
+    local pid=$(get_bot_pid)
+    if is_running "$pid"; then
+        local uptime=$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ')
+        echo "✓ Bot 运行中 (PID: $pid, 运行: $uptime)"
+        echo ""
+        echo "=== 最近日志 ==="
+        tail -10 "$BOT_LOG" 2>/dev/null
+        return 0
+    else
+        echo "✗ Bot 未运行"
+        return 1
+    fi
+}
+
+# ==================== 入口 ====================
+case "${1:-status}" in
+    start)   check_proxy; preflight_query_service; start_bot ;;
+    stop)    stop_bot ;;
+    status)  status_bot ;;
+    # 预检放在 stop 前，避免“Query Service 掉线导致 restart 把现有 bot 停掉”造成额外不可用
+    restart) check_proxy; preflight_query_service; stop_bot; sleep 2; start_bot ;;
+    *)
+        echo "用法: $0 {start|stop|status|restart}"
+        exit 1
+        ;;
+esac

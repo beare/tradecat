@@ -1,0 +1,1178 @@
+schema_version: "1.0"
+catalog_id: "tradecat_contract_probes"
+
+# 中央探测契约源。
+# - 已覆盖 Binance 主链/治理、Query HTTP/WS 出口、alternative 首批事实表、
+#   derived 指标/信号主表、predict/macro/planned 占位 probe
+# - 兼容期 `assets/catalog/data_sources.v1.yaml` 由这里投影，不再手写维护已迁入条目
+
+probes:
+  - source_id: "market/futures_um_candles_1m_table"
+    resource_id: "facts/market/futures_um_candles_1m"
+    name_zh: "UM 1m K线对象（market.binance_futures_um_candles_1m）"
+    impl_status: "scattered"
+    ttl_s: 300
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "DATA_SERVICE_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_futures_um_candles_1m;"
+      note: "Binance Stack 的 LF 运行分组核心对象；physical table 已与 futures_um_candles_1m public object 对齐。"
+    evidence:
+      - "assets/database/db/schema/001_timescaledb.sql"
+      - "core/market/binance/src/binance/sources/binance_api/adapters/timescale.py"
+
+  - source_id: "market/futures_um_metrics_snapshot_5m_table"
+    resource_id: "facts/market/futures_um_metrics_snapshot_5m"
+    name_zh: "UM 5m 指标快照对象（market.binance_futures_um_metrics_snapshot_5m）"
+    impl_status: "scattered"
+    ttl_s: 300
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "DATA_SERVICE_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_futures_um_metrics_snapshot_5m;"
+      note: "public object 与 physical table 已统一收口为 futures_um_metrics_snapshot_5m。"
+    evidence:
+      - "assets/database/db/schema/005_metrics_5m.sql"
+      - "core/market/binance/src/binance/sources/binance_api/adapters/timescale.py"
+
+  - source_id: "market/binance_hf_um_trades"
+    resource_id: "facts/market/futures_um_trades"
+    name_zh: "Binance 官方历史归档源 原子事实：UM trades（逐笔成交）"
+    impl_status: "scattered"
+    ttl_s: 5
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_futures_um_trades;"
+      note: "非默认启动链路；当前未进入 Query Service（严禁 consumption 直连 DB 作为对外出口）。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/futures_um_trades/collect.py"
+      - "core/market/binance/src/binance/storage/raw_futures_um_trades.py"
+
+  - source_id: "market/binance_hf_um_book_ticker"
+    resource_id: "facts/market/futures_um_book_ticker"
+    name_zh: "Binance 官方历史归档源 原子事实：UM bookTicker（Top-of-book）"
+    impl_status: "scattered"
+    ttl_s: 5
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_futures_um_book_ticker;"
+      note: "非默认启动链路；当前未进入 Query Service。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/futures_um_book_ticker/collect.py"
+      - "core/market/binance/src/binance/storage/raw_futures_um_book_ticker.py"
+
+  - source_id: "market/binance_hf_um_book_depth"
+    resource_id: "facts/market/futures_um_book_depth"
+    name_zh: "Binance 官方历史归档源 原子事实：UM bookDepth（订单簿深度）"
+    impl_status: "scattered"
+    ttl_s: 5
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_futures_um_book_depth;"
+      note: "非默认启动链路；当前未进入 Query Service。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/futures_um_book_depth/collect.py"
+      - "core/market/binance/src/binance/storage/raw_futures_um_book_depth.py"
+
+  - source_id: "market/spot_candles_1m_table"
+    resource_id: "facts/market/spot_candles_1m"
+    name_zh: "Spot 1m K线对象（market.binance_cagg_spot_klines_1m）"
+    impl_status: "derived"
+    ttl_s: 300
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "DATA_SERVICE_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_cagg_spot_klines_1m;"
+      note: "当前由 spot_trades 的连续聚合自动维护，不单独跑 Binance runtime worker。"
+    evidence:
+      - "assets/database/db/schema/017_crypto_trades_cagg_klines.sql"
+      - "core/market/binance/src/binance/datasets/spot_candles_1m/contract.py"
+
+  - source_id: "market/binance_hf_spot_trades"
+    resource_id: "facts/market/spot_trades"
+    name_zh: "Binance 官方历史归档源 原子事实：spot trades（逐笔成交）"
+    impl_status: "scattered"
+    ttl_s: 5
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_spot_trades;"
+      note: "非默认启动链路；当前未进入 Query Service。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/spot_trades/collect.py"
+      - "core/market/binance/src/binance/storage/raw_spot_trades.py"
+
+  - source_id: "meta/venues"
+    resource_id: "facts/market/shared_venue"
+    name_zh: "交易场所注册表（market.shared_venue）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_venue;"
+      note: "由 core/market/binance 的 HF 运行分组维护；未进入 Query Service。"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+      - "core/market/binance/src/binance/storage/core_registry.py"
+
+  - source_id: "meta/instruments"
+    resource_id: "facts/market/shared_instrument"
+    name_zh: "统一金融工具（market.shared_instrument）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_instrument;"
+      note: "跨市场 instrument_id 锚点表；供 symbol_map 映射。"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+
+  - source_id: "meta/symbol_map"
+    resource_id: "facts/market/shared_symbol_map"
+    name_zh: "symbol 映射（market.shared_symbol_map，as-of 语义）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_symbol_map;"
+      note: "硬约束见 013_core_symbol_map_hardening.sql；消费端严禁用 LIMIT 1 掩盖脏映射。"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+      - "assets/database/db/schema/013_core_symbol_map_hardening.sql"
+      - "core/market/binance/src/binance/storage/core_registry.py"
+
+  - source_id: "governance/storage_files"
+    resource_id: "facts/market/shared_files"
+    name_zh: "文件追溯（market.shared_files）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_files;"
+      note: "Binance 官方历史归档源 ZIP/CSV 入库追溯底座（rel_path -> file_id）；用于幂等/审计。"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+      - "core/market/binance/src/binance/storage/storage_files.py"
+
+  - source_id: "governance/storage_file_revisions"
+    resource_id: "facts/market/shared_file_revisions"
+    name_zh: "文件版本链（market.shared_file_revisions）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_file_revisions;"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+
+  - source_id: "governance/storage_import_batches"
+    resource_id: "facts/market/shared_import_batches"
+    name_zh: "导入批次（market.shared_import_batches）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_import_batches;"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+      - "core/market/binance/src/binance/storage/import_meta.py"
+
+  - source_id: "governance/storage_import_errors"
+    resource_id: "facts/market/shared_import_errors"
+    name_zh: "单文件导入错误（market.shared_import_errors）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_import_errors;"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+      - "core/market/binance/src/binance/storage/import_meta.py"
+
+  - source_id: "governance/crypto_ingest_runs"
+    resource_id: "facts/market/binance_ingest_runs"
+    name_zh: "采集运行生命周期（market.binance_ingest_runs）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_ingest_runs;"
+      note: "旁路治理表：realtime/backfill/repair 的 run 追溯。"
+    evidence:
+      - "assets/database/db/schema/012_crypto_ingest_governance.sql"
+      - "core/market/binance/src/binance/storage/ingest_meta.py"
+
+  - source_id: "governance/crypto_ingest_watermark"
+    resource_id: "facts/market/binance_ingest_watermark"
+    name_zh: "采集水位（market.binance_ingest_watermark）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_ingest_watermark;"
+    evidence:
+      - "assets/database/db/schema/012_crypto_ingest_governance.sql"
+      - "core/market/binance/src/binance/storage/ingest_meta.py"
+
+  - source_id: "governance/crypto_ingest_gaps"
+    resource_id: "facts/market/binance_ingest_gaps"
+    name_zh: "采集缺口队列（market.binance_ingest_gaps）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_ingest_gaps;"
+    evidence:
+      - "assets/database/db/schema/012_crypto_ingest_governance.sql"
+      - "core/market/binance/src/binance/storage/ingest_meta.py"
+
+  - source_id: "governance/kline_missing_intervals"
+    resource_id: "facts/market/binance_missing_intervals"
+    name_zh: "K线缺口队列（market.binance_missing_intervals）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "DATA_SERVICE_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_missing_intervals;"
+      note: "用于缺口检测/回填排队/审计；长期为空是正常状态，是否写入取决于 repair/gap 链路。"
+    evidence:
+      - "assets/database/db/schema/002_taker_buy_and_gap_tracking.sql"
+
+  - source_id: "governance/kline_ingest_offsets"
+    resource_id: "facts/market/binance_ingest_offsets"
+    name_zh: "K线导入偏移（market.binance_ingest_offsets）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "DATA_SERVICE_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_ingest_offsets;"
+      note: "用于重启断点/差异同步（若两库隔离，确保连接串指向 Binance Stack 的 LF 实际写入库）。"
+    evidence:
+      - "assets/database/db/schema/001_timescaledb.sql"
+
+  - source_id: "governance/lineage_events_table"
+    resource_id: "facts/governance/lineage_events"
+    name_zh: "血缘事件表（governance.lineage_events）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM governance.lineage_events;"
+      note: "内部观测用；该表在 facts_data 与 derived_data 各有一份（同名），Query 侧做 UNION；对外消费请走 /api/v1/lineage/*。"
+    evidence:
+      - "assets/database/db/schema/027_governance_lineage_events.sql"
+      - "core/query/src/query/lineage_dao.py"
+
+  - source_id: "events/alternative_news_table"
+    resource_id: "facts/alternative/news"
+    name_zh: "新闻事件事实表（alternative.news）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM alternative.news;"
+      note: "内部观测用；对外消费请走 Query Service：events/news_realtime 或 /api/v1/events。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "core/alternative/news/src/lib/db.ts"
+
+  - source_id: "events/alternative_telegram_table"
+    resource_id: "facts/alternative/telegram"
+    name_zh: "Telegram 消息事实表（alternative.telegram）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM alternative.telegram;"
+      note: "内部观测用；对外消费请走 Query Service：/api/v1/events。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "core/alternative/telegram/src/monitoring/telegram_monitor.py"
+
+  - source_id: "events/alternative_x_table"
+    resource_id: "facts/alternative/x"
+    name_zh: "X/Twitter 事件事实表（alternative.x）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM alternative.x;"
+      note: "内部观测用；对外消费请走 Query Service：/api/v1/events。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "core/alternative/x/tg-unified/src/bot.py"
+
+  - source_id: "events/alternative_investing_calendar_snapshots_table"
+    resource_id: "facts/alternative/investing_calendar_snapshots"
+    name_zh: "Investing 经济日历快照表（alternative.investing_calendar_snapshots）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM alternative.investing_calendar_snapshots;"
+      note: "内部观测用；对外消费请走 Query Service：calendar/event_calendar 或 /api/v1/calendar。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "core/alternative/investing/src/monitor.py"
+
+  - source_id: "events/alternative_hyperliquid_address_snapshots_table"
+    resource_id: "facts/alternative/hyperliquid_address_snapshots"
+    name_zh: "Hyperliquid 地址快照表（alternative.hyperliquid_address_snapshots）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM alternative.hyperliquid_address_snapshots;"
+      note: "内部观测用；对外消费请走 Query Service：events/hyper_positions* 或 /api/v1/positions*。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "core/alternative/hyperliquid/src/collectors/range_fetcher.py"
+
+  - source_id: "system/query_service_health"
+    name_zh: "Query Service 健康（含数据源探测）"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/health"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/health" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/query_v1.py"
+      - "core/query/src/query/datasources.py"
+
+  - source_id: "system/api_service_public_health"
+    name_zh: "API Service 公网健康检查（无鉴权）"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/health"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/health" | jq .
+    evidence:
+      - "core/query/src/routers/health.py"
+
+  - source_id: "system/query_service_capabilities"
+    name_zh: "能力发现（cards/intervals/sources）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/capabilities"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/capabilities" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/query_v1.py"
+
+  - source_id: "market/ohlc_history"
+    name_zh: "K线历史（CoinGlass 风格）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/ohlc/history"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/ohlc/history?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=10" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/ohlc.py"
+
+  - source_id: "market/binance_um_metrics_snapshot_5m_archive"
+    name_zh: "Binance 官方历史归档源 指标快照：UM metrics（归档 ZIP + 5m 快照主对象）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "DATA_SERVICE_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.binance_futures_um_metrics_snapshot_5m;"
+      note: "官方 metrics ZIP 与 live 5m snapshot 已统一落到单一指标主表，不再对外暴露 futures_um_metrics_atomic。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/futures_um_metrics_snapshot_5m/backfill.py"
+      - "core/market/binance/src/binance/sources/binance_api/backfill_shared.py"
+
+  - source_id: "market/binance_hf_cm_trades"
+    name_zh: "Binance 官方历史归档源 原子事实：CM trades（逐笔成交）"
+    impl_status: "archived"
+    ttl_s: 5
+    probe:
+      kind: "archive"
+      note: "2026-03-28 已归档到 archive_data_20260328.archive_20260328_market_cm；运行入口已关闭。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/_reserved/__init__.py"
+      - "assets/docs/core/current-database-truth.md"
+
+  - source_id: "market/binance_hf_cm_book_ticker"
+    name_zh: "Binance 官方历史归档源 原子事实：CM bookTicker（Top-of-book，占位）"
+    impl_status: "archived"
+    ttl_s: 5
+    probe:
+      kind: "archive"
+      note: "2026-03-28 已归档；未进入当前运行库。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/_reserved/futures_cm_book_ticker/__init__.py"
+      - "assets/database/db/schema/009_crypto_binance_vision_landing.sql"
+
+  - source_id: "market/binance_hf_cm_book_depth"
+    name_zh: "Binance 官方历史归档源 原子事实：CM bookDepth（深度曲线，占位）"
+    impl_status: "archived"
+    ttl_s: 5
+    probe:
+      kind: "archive"
+      note: "2026-03-28 已归档；未进入当前运行库。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/_reserved/futures_cm_book_depth/__init__.py"
+      - "assets/database/db/schema/009_crypto_binance_vision_landing.sql"
+
+  - source_id: "market/binance_hf_cm_metrics"
+    name_zh: "Binance 官方历史归档源 原子事实：CM metrics（交易所指标，占位）"
+    impl_status: "archived"
+    ttl_s: 300
+    probe:
+      kind: "archive"
+      note: "2026-03-28 已归档；未进入当前运行库。"
+    evidence:
+      - "assets/docs/core/current-database-truth.md"
+      - "assets/database/db/schema/009_crypto_binance_vision_landing.sql"
+
+  - source_id: "market/binance_hf_um_trades_readable"
+    name_zh: "Binance 官方历史归档源 trades（UM，可读视图）"
+    impl_status: "scattered"
+    ttl_s: 5
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT venue_code, symbol, time_ts_utc, price, qty FROM market.binance_vw_futures_um_trades ORDER BY time DESC LIMIT 5;"
+      note: "只读视图（把 venue_id/instrument_id 映射回 venue_code/symbol，并提供 UTC/北京时间戳）。"
+    evidence:
+      - "assets/database/db/schema/016_crypto_trades_readable_views.sql"
+
+  - source_id: "market/binance_hf_cm_trades_readable"
+    name_zh: "Binance 官方历史归档源 trades（CM，可读视图）"
+    impl_status: "archived"
+    ttl_s: 5
+    probe:
+      kind: "archive"
+      note: "2026-03-28 已归档；当前运行库不再保留 CM 可读视图。"
+    evidence:
+      - "assets/database/db/schema/016_crypto_trades_readable_views.sql"
+
+  - source_id: "market/binance_hf_spot_trades_readable"
+    name_zh: "Binance 官方历史归档源 trades（spot，可读视图）"
+    impl_status: "scattered"
+    ttl_s: 5
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT venue_code, symbol, time_ts_utc, price, qty FROM market.binance_vw_spot_trades ORDER BY time DESC LIMIT 5;"
+      note: "只读视图（把 venue_id/instrument_id 映射回 venue_code/symbol，并提供 UTC/北京时间戳）。"
+    evidence:
+      - "assets/database/db/schema/016_crypto_trades_readable_views.sql"
+
+  - source_id: "market/binance_hf_option_bvol_index"
+    name_zh: "Binance 官方历史归档源 原子事实：期权 BVOL Index"
+    impl_status: "planned"
+    ttl_s: 3600
+    probe:
+      kind: "tbd"
+      note: "collector 已存在，但未加入默认 CLI choices；先占位避免 future 命名漂移。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/_reserved/option_bvol_index/__init__.py"
+
+  - source_id: "market/binance_hf_option_eoh_summary"
+    name_zh: "Binance 官方历史归档源 原子事实：期权 EOH Summary"
+    impl_status: "planned"
+    ttl_s: 3600
+    probe:
+      kind: "tbd"
+      note: "collector 已存在，但未加入默认 CLI choices；先占位避免 future 命名漂移。"
+    evidence:
+      - "core/market/binance/src/binance/datasets/_reserved/option_eoh_summary/__init__.py"
+
+  - source_id: "market/open_interest_history"
+    name_zh: "Open Interest 历史（CoinGlass 风格）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/futures/open-interest/history"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/futures/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=10" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/open_interest.py"
+
+  - source_id: "market/futures_metrics"
+    name_zh: "期货综合指标（OI/多空比/主动成交比）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/futures/metrics"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/futures/metrics?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=10" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/futures_metrics.py"
+
+  - source_id: "market/funding_rate_history"
+    name_zh: "资金费率历史（当前占位：not_supported）"
+    impl_status: "planned"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/futures/funding-rate/history"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/futures/funding-rate/history?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=10" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/funding_rate.py"
+
+  - source_id: "indicators/dashboard"
+    name_zh: "看板聚合（多卡片×多周期）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/dashboard"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/dashboard?cards=volume_ranking&intervals=1h,4h&symbols=BTCUSDT,ETHUSDT&shape=wide&limit=50" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/query_v1.py"
+
+  - source_id: "indicators/debug_indicator_list"
+    name_zh: "指标表列表（debug-only）"
+    impl_status: "ready"
+    ttl_s: 3600
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/indicator/list"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/indicator/list" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/indicator.py"
+
+  - source_id: "indicators/debug_indicator_data"
+    name_zh: "指标表数据（debug-only）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/indicator/data"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/indicator/data?table=%E5%9F%BA%E7%A1%80%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E5%99%A8.py&interval=1h&limit=5" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/indicator.py"
+
+  - source_id: "indicators/debug_indicator_snapshot"
+    name_zh: "结构化指标快照（debug-only，旧接口）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/indicator/snapshot"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/indicator/snapshot?symbol=BTCUSDT&periods=1h,4h" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/indicator.py"
+
+  - source_id: "indicators/card"
+    name_zh: "单卡片（结构化 rows）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/cards/{card_id}"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/cards/volume_ranking?interval=1h&symbols=BTCUSDT,ETHUSDT&limit=200" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/query_v1.py"
+      - "assets/common/contracts/cards_contract.py"
+
+  - source_id: "indicators/symbol_snapshot"
+    name_zh: "单币快照（面板×周期）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/symbol/{symbol}/snapshot"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/symbol/BTCUSDT/snapshot?intervals=1h,4h&include_base=true" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/query_v1.py"
+
+  - source_id: "indicators/debug_table_passthrough"
+    name_zh: "指标表名直通（deprecated｜debug-only）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/v1/indicators/{table}"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/v1/indicators/%E5%9F%BA%E7%A1%80%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E5%99%A8.py?interval=1h&mode=latest_per_symbol&limit=5" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/query_v1.py"
+
+  - source_id: "indicators/snapshots_table"
+    name_zh: "指标快照主表（indicator_snapshots.snapshots）"
+    resource_id: "derived/indicator_snapshots/snapshots"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "derived"
+      dsn_env: "QUERY_PG_INDICATORS_URL"
+      query_hint: "SELECT COUNT(*) FROM indicator_snapshots.snapshots;"
+      note: "内部观测用；对外消费请走 Query Service：/api/v1/symbol/{symbol}/snapshot 或 /api/v1/dashboard。"
+    evidence:
+      - "assets/database/db/schema/026_indicator_snapshots_snapshots.sql"
+      - "plugins/trading/src/db/reader.py"
+
+  - source_id: "indicators/base_data"
+    name_zh: "基础数据（成交额/主动买卖比/振幅等）"
+    impl_status: "ready"
+    ttl_s: 300
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/futures/base-data"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/futures/base-data?symbol=BTCUSDT&interval=1h&limit=50" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/base_data.py"
+
+  - source_id: "signals/cooldown"
+    name_zh: "信号冷却状态"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/signal/cooldown"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/signal/cooldown" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/signal.py"
+
+  - source_id: "signals/cooldown_table"
+    resource_id: "derived/signal_runtime/cooldown"
+    name_zh: "信号冷却状态表（signal_runtime.cooldown）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "derived"
+      dsn_env: "QUERY_PG_INDICATORS_URL"
+      query_hint: "SELECT COUNT(*) FROM signal_runtime.cooldown;"
+      note: "内部观测用；对外消费请走 Query Service：signals/cooldown（/api/signal/cooldown）。"
+    evidence:
+      - "assets/database/db/schema/022_signal_state.sql"
+      - "plugins/signal/src/storage/cooldown.py"
+
+  - source_id: "signals/history"
+    resource_id: "derived/signal_runtime/signal_history"
+    name_zh: "信号历史（signal_runtime.signal_history）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "derived"
+      dsn_env: "QUERY_PG_INDICATORS_URL"
+      query_hint: "SELECT COUNT(*) FROM signal_runtime.signal_history;"
+      note: "PG 已落库，但 Query Service 尚未暴露读端点（先占位，避免后续命名漂移）。"
+    evidence:
+      - "plugins/signal/src/storage/history.py"
+      - "assets/database/db/schema/022_signal_runtime.sql"
+
+  - source_id: "signals/subscriptions"
+    resource_id: "derived/signal_runtime/signal_subs"
+    name_zh: "信号订阅（signal_runtime.signal_subs）"
+    impl_status: "scattered"
+    ttl_s: 300
+    probe:
+      kind: "sql"
+      database_ref: "derived"
+      dsn_env: "QUERY_PG_INDICATORS_URL"
+      query_hint: "SELECT COUNT(*) FROM signal_runtime.signal_subs;"
+      note: "目前主要用于 signal-service 内部治理；是否需要对外消费待评审。"
+    evidence:
+      - "plugins/signal/src/storage/subscription.py"
+      - "assets/database/db/schema/022_signal_runtime.sql"
+
+  - source_id: "meta/supported_coins"
+    name_zh: "支持币种列表"
+    impl_status: "ready"
+    ttl_s: 3600
+    probe:
+      kind: "http"
+      method: "GET"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      path: "/api/futures/supported-coins"
+      auth:
+        header: "X-Internal-Token"
+        token_env: "QUERY_SERVICE_TOKEN"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL}/api/futures/supported-coins" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/coins.py"
+
+  - source_id: "meta/currencies"
+    name_zh: "货币维表（market.shared_currency）"
+    impl_status: "scattered"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "BINANCE_HF_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM market.shared_currency;"
+      note: "跨市场共享维表；当前主要由采集侧按需写入。"
+    evidence:
+      - "assets/database/db/schema/008_market_shared.sql"
+
+  - source_id: "governance/sheets_state_sent_keys"
+    name_zh: "Sheets 幂等键（已归档，原 sheets_state.sent_keys）"
+    impl_status: "archived"
+    ttl_s: 3600
+    probe:
+      kind: "sql"
+      dsn_env: "DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM archive_20260328_derived_sheets_state.sent_keys;"
+      note: "该 PG 方案未实际启用，已归档到 archive_data_20260328；sheets-service 当前仍使用 Sheets 隐藏 tab / 本地文件做幂等。"
+    evidence:
+      - "assets/database/db/schema/023_sheets_state.sql"
+      - "plugins/sheets/src/idempotency.py"
+
+  - source_id: "events/unified_events_view"
+    resource_id: "facts/alternative/unified_events_view"
+    name_zh: "统一事件流视图（alternative.unified_events）"
+    impl_status: "scattered"
+    ttl_s: 15
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT type, ts, tag, source_label, content FROM alternative.unified_events ORDER BY ts DESC LIMIT 15;"
+      note: "用于把 alternative.* 六张事实表聚合成统一事件流；是事件域 SQL 主读入口。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "assets/database/db/schema/025_event_unified_view.sql"
+
+  - source_id: "events/alternative_discord_table"
+    resource_id: "facts/alternative/discord"
+    name_zh: "Discord 消息事实表（alternative.discord）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "sql"
+      database_ref: "facts"
+      dsn_env: "FACTS_DATABASE_URL"
+      query_hint: "SELECT COUNT(*) FROM alternative.discord;"
+      note: "内部观测用；对外消费请走 Query Service：/api/v1/events。"
+    evidence:
+      - "assets/database/db/schema/024_event_service.sql"
+      - "core/alternative/discord/src/monitor.py"
+
+  - source_id: "events/news_realtime"
+    name_zh: "实时新闻流（去重+过滤后）"
+    impl_status: "ready"
+    ttl_s: 15
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/events"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/events?tag=新闻&hours=24&limit=15" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/alternative/news/src/lib/db.ts"
+      - "core/query/src/routers/events.py"
+      - "plugins/sheets/src/news_exporter.py"
+
+  - source_id: "events/latest_cursor"
+    name_zh: "事件流最新游标（用于增量同步）"
+    impl_status: "ready"
+    ttl_s: 15
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/events/latest"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/events/latest" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/events.py"
+
+  - source_id: "events/ws_stream"
+    name_zh: "事件流 WebSocket（增量推送）"
+    impl_status: "ready"
+    ttl_s: 0
+    probe:
+      kind: "ws"
+      url_hint: "ws://127.0.0.1:8088/api/v1/ws"
+      note: "统一出口：Query Service（强制鉴权 Header: X-Internal-Token）；订阅协议与旧 event-service WS 兼容；迁移期 alias：WS /v1/ws（同实现）。"
+    evidence:
+      - "core/query/src/routers/events_ws.py"
+
+  - source_id: "events/tg_messages"
+    name_zh: "TG 监听消息（必须脱敏）"
+    impl_status: "ready"
+    ttl_s: 15
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/events"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/events?hours=24&limit=200" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" \
+          | jq '{count: ([.data.list[] | select(.type=="telegram")] | length), sample: ([.data.list[] | select(.type=="telegram")] | .[:3])}'
+    evidence:
+      - "core/alternative/telegram/src/monitoring/telegram_monitor.py"
+      - "core/query/src/routers/events.py"
+      - "plugins/sheets/src/tg_messages_exporter.py"
+
+  - source_id: "events/discord_messages"
+    name_zh: "Discord 监听消息"
+    impl_status: "ready"
+    ttl_s: 15
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/events"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/events?hours=24&limit=200" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" \
+          | jq '{count: ([.data.list[] | select(.type=="discord")] | length), sample: ([.data.list[] | select(.type=="discord")] | .[:3])}'
+    evidence:
+      - "core/alternative/discord/src/monitor.py"
+      - "core/query/src/routers/events.py"
+
+  - source_id: "events/x_posts"
+    name_zh: "X/Twitter 事件流"
+    impl_status: "ready"
+    ttl_s: 30
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/events"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/events?hours=24&limit=200" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" \
+          | jq '{count: ([.data.list[] | select(.type=="twitter")] | length), sample: ([.data.list[] | select(.type=="twitter")] | .[:3])}'
+    evidence:
+      - "core/alternative/AGENTS.md"
+      - "core/query/src/routers/events.py"
+
+  - source_id: "events/hyper_positions"
+    name_zh: "Hyperliquid 持仓全量（含分段过滤）"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/positions"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/positions" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/events.py"
+
+  - source_id: "events/hyper_positions_summary"
+    name_zh: "Hyperliquid 持仓摘要（外部账户画像）"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/positions/summary"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/positions/summary" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/events.py"
+
+  - source_id: "meta/event_tags"
+    name_zh: "事件标签统计（24h）"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/tags"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/tags" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/events.py"
+
+  - source_id: "governance/event_service_stats"
+    name_zh: "事件系统统计（valid_tags/channels/latest）"
+    impl_status: "ready"
+    ttl_s: 60
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/stats"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/stats" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/query/src/routers/events.py"
+
+  - source_id: "calendar/event_calendar"
+    name_zh: "事件日历（FOMC/CPI/PMI/期权到期/解锁等）"
+    impl_status: "ready"
+    ttl_s: 3600
+    probe:
+      kind: "http"
+      base_url_env: "QUERY_SERVICE_BASE_URL"
+      base_url_hint: "http://127.0.0.1:8088"
+      path: "/api/v1/calendar"
+      example_curl: |
+        curl -sS "${QUERY_SERVICE_BASE_URL:-http://127.0.0.1:8088}/api/v1/calendar" \
+          -H "X-Internal-Token: ${QUERY_SERVICE_TOKEN}" | jq .
+    evidence:
+      - "core/alternative/investing/src/monitor.py"
+      - "core/query/src/routers/events.py"
+
+  - source_id: "predict/polymarket_signals"
+    name_zh: "Polymarket 信号（聪明钱/订单簿/套利等）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "log_or_file"
+      path_hint: "~/.local/state/tradecat/polymarket.log"
+    evidence:
+      - "plugins/predict/services/polymarket"
+      - "plugins/sheets/src/polymarket_exporter.py"
+
+  - source_id: "predict/polymarket_facts_events"
+    name_zh: "Polymarket facts（结构化 JSONL，最近 24h）"
+    impl_status: "scattered"
+    ttl_s: 900
+    probe:
+      kind: "log_or_file"
+      path_hint: "~/.local/state/tradecat/polymarket/facts/events/<YYYY-MM-DD>.jsonl"
+      note: "结构化事实（JSONL），用于审计/排障；由 sheets-service 旁路导出。"
+    evidence:
+      - "plugins/sheets/src/polymarket_facts_exporter.py"
+
+  - source_id: "predict/kalshi_signals"
+    name_zh: "Kalshi 信号（Bot 日志）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "log_or_file"
+      path_hint: "plugins/predict/services/kalshi/logs/out.log"
+    evidence:
+      - "plugins/predict/services/kalshi"
+      - "plugins/predict/services/kalshi/ecosystem.config.js"
+
+  - source_id: "predict/opinion_signals"
+    name_zh: "Opinion/Polymarket 备用 Bot 信号（日志）"
+    impl_status: "scattered"
+    ttl_s: 60
+    probe:
+      kind: "log_or_file"
+      path_hint: "plugins/predict/services/opinion/logs/out.log"
+      note: "该子服务命名为 opinion，但 README 显示为 Polymarket 信号 Bot；是否保留/合并待清理。"
+    evidence:
+      - "plugins/predict/services/opinion"
+      - "plugins/predict/services/opinion/ecosystem.config.js"
+
+  - source_id: "macro/snapshot_wide"
+    name_zh: "宏观大宗宽表快照（DXY/VIX/金油/美债等）"
+    impl_status: "scattered"
+    ttl_s: 900
+    probe:
+      kind: "script"
+      entry_hint: "plugins/sheets/src/macro_snapshot.py"
+      note: "当前由 sheets-service 直接抓取（Stooq + Yahoo chart），后续建议统一落库后由 Query Service 出口。"
+    evidence:
+      - "plugins/sheets/src/macro_snapshot.py"
+
+  - source_id: "onchain/*"
+    name_zh: "链上数据（占位）"
+    impl_status: "planned"
+    ttl_s: 300
+    probe:
+      kind: "tbd"
+
+  - source_id: "sentiment/*"
+    name_zh: "舆情数据（占位）"
+    impl_status: "planned"
+    ttl_s: 60
+    probe:
+      kind: "tbd"
+
+  - source_id: "portfolio/state"
+    name_zh: "账户与风险约束（内部状态）"
+    impl_status: "planned"
+    ttl_s: 5
+    probe:
+      kind: "tbd"
+
+  - source_id: "execution/constraints"
+    name_zh: "执行约束与成本（最小下单/手续费/滑点等）"
+    impl_status: "planned"
+    ttl_s: 3600
+    probe:
+      kind: "tbd"
+
+  - source_id: "governance/data_quality"
+    name_zh: "数据治理（新鲜度/缺失/异常/去重结果）"
+    impl_status: "planned"
+    ttl_s: 60
+    probe:
+      kind: "tbd"
+
+  - source_id: "memory/recent_decisions"
+    name_zh: "历史决策记忆（避免抖动/重复开平）"
+    impl_status: "planned"
+    ttl_s: 30
+    probe:
+      kind: "tbd"
